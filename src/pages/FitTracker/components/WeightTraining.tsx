@@ -256,8 +256,8 @@ ${historyText || '無歷史紀錄'}
     }
   };
 
-  const playMotivationVoice = async (activeEx: Exercise, previousSets: SetRecord[], newSet: SetRecord) => {
-    if (!ttsEnabled) return;
+  const playMotivationVoice = async (activeEx: Exercise, previousSets: SetRecord[], newSet: SetRecord, audioCtx: AudioContext | null) => {
+    if (!ttsEnabled || !audioCtx) return;
     try {
       const prompt = `你是一個充滿活力、陽光開朗的年輕健身教練，用語音的方式給予學生一句簡短的鼓勵。
 學生剛完成：${activeEx.name}
@@ -290,7 +290,10 @@ ${historyText || '無歷史紀錄'}
       const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (base64Audio) {
         const audioData = decodeBase64(base64Audio);
-        await playRawPcm(audioData);
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
+        await playRawPcm(audioData, audioCtx);
       }
     } catch (error) {
       console.error("AI 語音激勵播放失敗", error);
@@ -299,6 +302,20 @@ ${historyText || '無歷史紀錄'}
 
   const handleAddSet = () => {
     if (!activeExercise) return;
+
+    // ✨ Safari/iOS Autoplay policy: 必須在 user click 瞬間產生並 resume context
+    let audioCtx: AudioContext | null = null;
+    if (ttsEnabled) {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass({ sampleRate: 24000 });
+          audioCtx.resume(); // 先行喚醒
+        }
+      } catch (e) {
+        console.error('AudioContext init error', e);
+      }
+    }
 
     const weightInKg = unit === 'LBS' ? lbsToKg(currentWeight) : currentWeight;
     const newSet: SetRecord = {
@@ -329,7 +346,7 @@ ${historyText || '無歷史紀錄'}
     setRestEndTime(endTime);
     setTimeLeft(REST_TIME_SECONDS);
 
-    playMotivationVoice(activeExercise, prevSets, newSet);
+    playMotivationVoice(activeExercise, prevSets, newSet, audioCtx);
     onSetComplete();
   };
 

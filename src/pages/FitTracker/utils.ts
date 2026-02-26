@@ -22,8 +22,8 @@ export const calculateExerciseKcal = (met: number, weightKg: number, durationMin
 export const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
 export const getDailyStats = (
-  weightSessions: any[], 
-  cardioRecords: any[], 
+  weightSessions: any[],
+  cardioRecords: any[],
   bodyData: any,
   dateString: string
 ) => {
@@ -74,10 +74,10 @@ export function decodeBase64(base64: string): Uint8Array {
 
 export async function playRawPcm(
   data: Uint8Array,
+  audioCtx: AudioContext,
   sampleRate: number = 24000,
   numChannels: number = 1
 ) {
-  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate });
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
   const audioBuffer = audioCtx.createBuffer(numChannels, frameCount, sampleRate);
