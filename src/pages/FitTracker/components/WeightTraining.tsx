@@ -56,6 +56,7 @@ const WeightTraining: React.FC<Props> = ({
   const [isAddingExercise, setIsAddingExercise] = useState(false);
   const [newExName, setNewExName] = useState('');
   const [newExCategory, setNewExCategory] = useState<WorkoutCategory>('Chest');
+  const [editingCategory, setEditingCategory] = useState<WorkoutCategory | null>(null);
 
   const [restEndTime, setRestEndTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -453,6 +454,13 @@ ${historyText || '無歷史紀錄'}
         )}
       </div>
 
+      <button
+        onClick={() => setEditingCategory(selectedCategory)}
+        className="mt-6 w-full p-4 rounded-3xl bg-slate-50 border-2 border-slate-100 text-slate-500 font-bold text-sm hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
+      >
+        <span>✏️</span> 編輯{CATEGORIES_CN[selectedCategory]}器材名稱
+      </button>
+
       {
         isAddingExercise && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
@@ -709,7 +717,42 @@ ${historyText || '無歷史紀錄'}
           </div>
         )
       }
-    </div >
+
+      {/* Edit Equipment Modal */}
+      {
+        editingCategory && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in" onClick={() => setEditingCategory(null)}>
+            <div className="bg-white w-full max-w-sm h-auto max-h-[80vh] flex flex-col rounded-[2.5rem] shadow-2xl p-6 sm:p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-6 px-1">
+                <h3 className="text-xl font-black text-slate-800 tracking-tight">編輯{CATEGORIES_CN[editingCategory]}器材</h3>
+                <button onClick={() => setEditingCategory(null)} className="p-2 -mr-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors">✕</button>
+              </div>
+              <div className="overflow-y-auto pr-2 space-y-3 flex-1 no-scrollbar">
+                {exercises.filter(ex => ex.category === editingCategory).map(ex => (
+                  <div key={ex.id} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <span className="font-bold text-slate-700 text-sm truncate pr-2">{ex.name}</span>
+                    <button
+                      onClick={() => {
+                        const newName = window.prompt(`請輸入 [${ex.name}] 的新名稱：`, ex.name);
+                        if (newName && newName.trim() !== '' && newName !== ex.name) {
+                          setExercises(prev => prev.map(e => e.id === ex.id ? { ...e, name: newName.trim() } : e));
+                        }
+                      }}
+                      className="px-4 py-1.5 rounded-full bg-indigo-50 text-indigo-600 font-black text-xs whitespace-nowrap hover:bg-indigo-100 transition-colors shadow-sm"
+                    >
+                      修改
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 pt-2">
+                <button onClick={() => setEditingCategory(null)} className="w-full py-4 rounded-xl font-black text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">關閉</button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div>
   );
 };
 

@@ -63,21 +63,21 @@ const SettingsModal: React.FC<Props> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-in fade-in" onClick={onClose}>
       <div
-        className="bg-white w-full max-w-sm max-h-[90vh] rounded-[2.5rem] shadow-2xl p-8 space-y-5 animate-in zoom-in-95 duration-200 overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
+        className="bg-slate-50 w-full max-w-md h-[90vh] sm:h-auto sm:max-h-[90vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl p-6 sm:p-8 space-y-4 overflow-y-auto"
+        onClick={e => e.stopPropagation()}
       >
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">⚙️</div>
-          <h2 className="text-xl font-black text-slate-800">設定</h2>
+        <div className="flex justify-between items-center mb-2 px-2">
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight">設定</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-300 hover:text-slate-700 transition-colors">
+            <span className="sr-only">關閉</span>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
 
-        {/* AI Features Section */}
-        <div className="space-y-3">
+        {/* General Settings */}
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">AI 功能</p>
 
           {/* TTS Toggle */}
@@ -121,21 +121,20 @@ const SettingsModal: React.FC<Props> = ({
           )}
 
           {/* Periodization Toggle */}
-          <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl mt-4">
+          <div className="flex items-center justify-between p-1 mt-4">
             <div className="flex items-center gap-3">
-              <span className="text-lg">🧠</span>
+              <span className="text-xl">🧠</span>
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-black text-slate-700">Smart Coach 週期</p>
+                  <p className="text-sm font-black text-slate-800">Smart Coach 週期</p>
                   <button
                     onClick={() => {
-                      onClose(); // Optional: close settings when opening info
                       setShowPeriodizationInfo(true);
                     }}
-                    className="w-4 h-4 bg-slate-200 rounded-full text-[8px] font-black text-slate-500 flex items-center justify-center"
+                    className="w-4 h-4 bg-slate-200 rounded-full text-[8px] font-black text-slate-500 flex items-center justify-center hover:bg-slate-300 transition-colors"
                   >?</button>
                 </div>
-                <p className="text-[10px] text-slate-400">自動變換訓練重量和次數</p>
+                <p className="text-[10px] text-slate-500">自動變換訓練重量和次數</p>
               </div>
             </div>
             <button
@@ -148,8 +147,8 @@ const SettingsModal: React.FC<Props> = ({
         </div>
 
         {/* Body Data Section */}
-        <div className="space-y-3 pt-2">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">體態數據</p>
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-3">
+          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">體態數據</p>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
@@ -183,8 +182,8 @@ const SettingsModal: React.FC<Props> = ({
         </div>
 
         {/* Data Section */}
-        <div className="space-y-3">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">資料管理</p>
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-3">
+          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">資料管理</p>
 
           <button
             onClick={onDownload}
@@ -238,12 +237,6 @@ const SettingsModal: React.FC<Props> = ({
           <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
         </div>
 
-        <button
-          onClick={onClose}
-          className="w-full py-4 rounded-2xl font-black text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
-        >
-          完成
-        </button>
       </div>
     </div>
   );
