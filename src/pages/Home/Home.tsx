@@ -1,3 +1,4 @@
+import React from 'react'
 import { Link } from 'react-router-dom'
 import './Home.css'
 
@@ -50,7 +51,7 @@ export default function Home() {
                         key={to}
                         to={to}
                         className="feature-card"
-                        style={{ '--card-accent': accent }}
+                        style={{ '--card-accent': accent } as React.CSSProperties}
                     >
                         <span className="feature-icon">{icon}</span>
                         <h3>{title}</h3>

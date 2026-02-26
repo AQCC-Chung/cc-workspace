@@ -1,17 +1,17 @@
-import sqlite3
-import requests
+import httpx
+import asyncio
 from bs4 import BeautifulSoup
 import re
-import random
 import os
-import json
 from urllib.parse import urlparse, quote
 from dotenv import load_dotenv
+from sqlmodel import Session, select
+from database import engine
+from models.recommendation import Recommendation
 from query_parser import parse_query
 
 load_dotenv()
 
-DB_NAME = "influencer.db"
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 
 HEADERS = {
@@ -309,7 +309,7 @@ def get_google_place_type_query(keyword, city='台北'):
 
 
 # ---------- Step 1: Search DuckDuckGo for article URLs ----------
-def search_articles(keyword, max_articles=5):
+async def search_articles(client, keyword, max_articles=5):
     """Search DuckDuckGo Lite and return a list of article dicts."""
     print(f"[Step 1] Searching DuckDuckGo for articles: '{keyword}'")
     search_url = "https://lite.duckduckgo.com/lite/"
@@ -317,7 +317,7 @@ def search_articles(keyword, max_articles=5):
     article_urls = []
 
     try:
-        response = requests.post(search_url, data=payload, headers=HEADERS, timeout=15)
+        response = await client.post(search_url, data=payload)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         title_links = soup.find_all('a', class_='result-link')
@@ -342,7 +342,7 @@ def search_articles(keyword, max_articles=5):
 
 
 # ---------- Step 2: Visit article and extract names + recommendation sentences ----------
-def extract_places_from_article(url, max_names=5):
+async def extract_places_from_article(client, url, max_names=5):
     """
     Visit an article and extract restaurant/place names along with
     a contextual recommendation sentence for each.
@@ -351,7 +351,7 @@ def extract_places_from_article(url, max_names=5):
     results = []
 
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
+        response = await client.get(url)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -481,7 +481,7 @@ def extract_nearby_text(tag_obj, place_name):
 
 
 # ---------- Step 3: Google Places API with location bias + type validation ----------
-def lookup_google_place(place_name, city='台北'):
+async def lookup_google_place(client, place_name, city='台北'):
     """
     Use Google Places Text Search with location bias.
     Validates type and address.
@@ -500,7 +500,7 @@ def lookup_google_place(place_name, city='台北'):
     }
 
     try:
-        response = requests.get(url, params=params, timeout=10)
+        response = await client.get(url, params=params)
         data = response.json()
 
         if data.get('status') != 'OK' or not data.get('results'):
@@ -537,7 +537,6 @@ def lookup_google_place(place_name, city='台北'):
                     photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_ref}&key={GOOGLE_API_KEY}"
 
             place_id = place.get('place_id', '')
-            from urllib.parse import quote
             if place_id:
                 maps_url = f"https://www.google.com/maps/search/?api=1&query={quote(name)}&query_place_id={place_id}"
             else:
@@ -565,7 +564,7 @@ def lookup_google_place(place_name, city='台北'):
 
 
 # ---------- Google Places direct search (fallback) ----------
-def google_places_direct_search(keyword, city='台北', limit=10):
+async def google_places_direct_search(client, keyword, city='台北', limit=10):
     """
     Fallback: search Google Places directly when article scraping fails.
     Uses keyword as the query against Google Places Text Search.
@@ -591,7 +590,7 @@ def google_places_direct_search(keyword, city='台北', limit=10):
 
     results = []
     try:
-        response = requests.get(url, params=params, timeout=10)
+        response = await client.get(url, params=params)
         data = response.json()
 
         if data.get('status') != 'OK':
@@ -626,7 +625,6 @@ def google_places_direct_search(keyword, city='台北', limit=10):
                     photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_ref}&key={GOOGLE_API_KEY}"
 
             place_id = place.get('place_id', '')
-            from urllib.parse import quote
             if place_id:
                 maps_url = f"https://www.google.com/maps/search/?api=1&query={quote(name)}&query_place_id={place_id}"
             else:
@@ -657,7 +655,7 @@ def google_places_direct_search(keyword, city='台北', limit=10):
 
 
 # ---------- Step 4: Main scrape pipeline ----------
-def scrape_data(keyword='台北 推薦 餐廳 網紅', limit=10, page=1):
+async def scrape_data(keyword='台北 推薦 餐廳 網紅', limit=10, page=1):
     """
     Full pipeline: Search → Visit articles → Extract names+quotes → Google Places lookup.
     Supports pagination, bilingual search (Chinese + English), and smart query parsing.
@@ -681,90 +679,106 @@ def scrape_data(keyword='台北 推薦 餐廳 網紅', limit=10, page=1):
     offset = (page - 1) * limit
     total_needed = offset + limit + 1  # +1 to probe if more exist
 
-    # Step 1: Find articles — bilingual DuckDuckGo search
-    max_articles = min(5 + (page - 1) * 2, 10)
-    half = max(max_articles // 2, 2)
+    async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True) as client:
+        # Step 1: Find articles — bilingual DuckDuckGo search
+        max_articles = min(5 + (page - 1) * 2, 10)
+        half = max(max_articles // 2, 2)
 
-    # Search in Chinese
-    articles_zh = search_articles(zh_query, max_articles=half)
-    # Search in English
-    articles_en = search_articles(en_query, max_articles=half)
+        # Parallel search
+        search_tasks = [
+            search_articles(client, zh_query, max_articles=half),
+            search_articles(client, en_query, max_articles=half)
+        ]
+        results = await asyncio.gather(*search_tasks)
+        articles_zh, articles_en = results
 
-    # Merge and deduplicate by URL
-    seen_urls = set()
-    articles = []
-    for a in articles_zh + articles_en:
-        if a['url'] not in seen_urls:
-            seen_urls.add(a['url'])
-            articles.append(a)
+        # Merge and deduplicate by URL
+        seen_urls = set()
+        articles = []
+        for a in articles_zh + articles_en:
+            if a['url'] not in seen_urls:
+                seen_urls.add(a['url'])
+                articles.append(a)
 
-    print(f"[Bilingual search] {len(articles_zh)} zh + {len(articles_en)} en = {len(articles)} total unique articles")
+        print(f"[Bilingual search] {len(articles_zh)} zh + {len(articles_en)} en = {len(articles)} total unique articles")
 
-    # Step 2: Extract place names from articles
-    all_places = []
-    for article in articles:
-        extracted = extract_places_from_article(article['url'])
-        for place in extracted:
-            if not any(p['name'] == place['name'] for p in all_places):
-                all_places.append({
-                    'name': place['name'],
-                    'recommendation': place['recommendation'],
-                    'article_title': article['title'],
-                    'article_url': article['url'],
-                    'site_name': article['site_name']
+        # Step 2: Extract place names from articles
+        all_places = []
+        extract_tasks = []
+        for article in articles:
+             extract_tasks.append(extract_places_from_article(client, article['url']))
+
+        if extract_tasks:
+            extracted_lists = await asyncio.gather(*extract_tasks)
+            for i, extracted in enumerate(extracted_lists):
+                article = articles[i]
+                for place in extracted:
+                    if not any(p['name'] == place['name'] for p in all_places):
+                        all_places.append({
+                            'name': place['name'],
+                            'recommendation': place['recommendation'],
+                            'article_title': article['title'],
+                            'article_url': article['url'],
+                            'site_name': article['site_name']
+                        })
+                    if len(all_places) >= total_needed * 3:
+                        break
+                if len(all_places) >= total_needed * 3:
+                    break
+
+        print(f"\n[Summary] Collected {len(all_places)} unique place names from articles")
+
+        # Step 3: Enrich with Google Places API
+        all_results = []
+
+        # Limit the number of lookups to reasonable amount (e.g. 2x needed)
+        lookup_candidates = all_places[:total_needed * 2]
+        lookup_tasks = []
+        for place_info in lookup_candidates:
+            lookup_tasks.append(lookup_google_place(client, place_info['name'], city=city))
+
+        if lookup_tasks:
+            print(f"\n[Step 3] Looking up {len(lookup_tasks)} places via Google API...")
+            lookup_results = await asyncio.gather(*lookup_tasks)
+
+            for i, place_data in enumerate(lookup_results):
+                place_info = lookup_candidates[i]
+                if not place_data.get('found'):
+                    continue
+
+                types = set(place_data.get('types', []))
+                category = classify_category(types, place_data['name'])
+
+                rating = place_data.get('rating', 4.0)
+                price_range = "$" if rating < 4.0 else "$$" if rating < 4.5 else "$$$"
+
+                all_results.append({
+                    'name': place_data['name'],
+                    'category': category,
+                    'image': place_data.get('photo_url', 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=1600'),
+                    'influencer': place_info['site_name'],
+                    'quote': place_info['recommendation'],
+                    'rating': rating,
+                    'price_range': price_range,
+                    'location': city,
+                    'source_url': place_data.get('maps_url', ''),
+                    'article_url': place_info['article_url'],
+                    'address': place_data.get('address', '')
                 })
-        if len(all_places) >= total_needed * 3:
-            break
+                print(f"  ✅ {place_data['name']} ({rating}⭐) — {category} — from {place_info['site_name']}")
 
-    print(f"\n[Summary] Collected {len(all_places)} unique place names from articles")
+        # Fallback: If too few results, use Google Places direct search
+        if len(all_results) < total_needed:
+            shortfall = total_needed - len(all_results)
+            print(f"\n[Fallback] Only {len(all_results)} results, need {shortfall} more from Google Places directly")
+            direct_results = await google_places_direct_search(client, zh_query, city, limit=shortfall + 5)
 
-    # Step 3: Enrich with Google Places API
-    all_results = []
-    skipped = 0
-    for place_info in all_places:
-        if len(all_results) >= total_needed:
-            break  # We have enough (including probe)
-
-        print(f"\n[Step 3] Looking up: '{place_info['name']}'")
-        place_data = lookup_google_place(place_info['name'], city=city)
-
-        if not place_data.get('found'):
-            skipped += 1
-            continue
-
-        types = set(place_data.get('types', []))
-        category = classify_category(types, place_data['name'])
-
-        rating = place_data.get('rating', 4.0)
-        price_range = "$" if rating < 4.0 else "$$" if rating < 4.5 else "$$$"
-
-        all_results.append({
-            'name': place_data['name'],
-            'category': category,
-            'image': place_data.get('photo_url', 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=1600'),
-            'influencer': place_info['site_name'],
-            'quote': place_info['recommendation'],
-            'rating': rating,
-            'price_range': price_range,
-            'location': city,
-            'source_url': place_data.get('maps_url', ''),
-            'article_url': place_info['article_url'],
-            'address': place_data.get('address', '')
-        })
-        print(f"  ✅ {place_data['name']} ({rating}⭐) — {category} — from {place_info['site_name']}")
-
-    # Fallback: If too few results, use Google Places direct search
-    if len(all_results) < total_needed:
-        shortfall = total_needed - len(all_results)
-        print(f"\n[Fallback] Only {len(all_results)} results, need {shortfall} more from Google Places directly")
-        direct_results = google_places_direct_search(zh_query, city, limit=shortfall + 5)
-
-        # Deduplicate
-        existing_names = {r['name'] for r in all_results}
-        for dr in direct_results:
-            if dr['name'] not in existing_names and len(all_results) < total_needed:
-                all_results.append(dr)
-                existing_names.add(dr['name'])
+            # Deduplicate
+            existing_names = {r['name'] for r in all_results}
+            for dr in direct_results:
+                if dr['name'] not in existing_names and len(all_results) < total_needed:
+                    all_results.append(dr)
+                    existing_names.add(dr['name'])
 
     # Determine has_more before slicing
     has_more = len(all_results) > offset + limit
@@ -779,41 +793,34 @@ def scrape_data(keyword='台北 推薦 餐廳 網紅', limit=10, page=1):
     return page_results, has_more
 
 
-def init_db_if_needed():
-    if not os.path.exists(DB_NAME):
-        import database
-        database.init_db()
-
-
 def save_to_db(items, append=False):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    if not append:
-        c.execute('DELETE FROM recommendations')
+    with Session(engine) as session:
+        if not append:
+            # Clear table
+            from sqlalchemy import text
+            session.exec(text("DELETE FROM recommendations"))
+            session.commit()
 
-    count = 0
-    for item in items:
-        c.execute('SELECT id FROM recommendations WHERE name = ?', (item['name'],))
-        if not c.fetchone():
-            c.execute('''
-                INSERT INTO recommendations (name, category, image, influencer, quote, rating, price_range, location, source_url, article_url, address)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                item['name'], item['category'], item.get('image', ''),
-                item.get('influencer', ''), item.get('quote', ''),
-                item.get('rating', 4.5), item.get('price_range', '$$'),
-                item.get('location', 'Taipei'), item.get('source_url', ''),
-                item.get('article_url', ''), item.get('address', '')
-            ))
-            count += 1
+        count = 0
+        for item in items:
+            statement = select(Recommendation).where(Recommendation.name == item['name'])
+            results = session.exec(statement)
+            if not results.first():
+                rec = Recommendation(
+                    name=item['name'],
+                    category=item['category'],
+                    image=item.get('image', ''),
+                    influencer=item.get('influencer', ''),
+                    quote=item.get('quote', ''),
+                    rating=item.get('rating', 4.5),
+                    price_range=item.get('price_range', '$$'),
+                    location=item.get('location', 'Taipei'),
+                    source_url=item.get('source_url', ''),
+                    article_url=item.get('article_url', ''),
+                    address=item.get('address', '')
+                )
+                session.add(rec)
+                count += 1
 
-    conn.commit()
-    conn.close()
+        session.commit()
     print(f"Saved {count} recommendations to database.")
-
-
-if __name__ == "__main__":
-    init_db_if_needed()
-    data, _ = scrape_data()
-    save_to_db(data)
-    print("Done.")

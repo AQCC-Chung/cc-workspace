@@ -1,30 +1,21 @@
-import sqlite3
+from sqlmodel import SQLModel, create_engine, Session
+from models.recommendation import Recommendation  # noqa: F401
 import os
 
 DB_NAME = "influencer.db"
+sqlite_url = f"sqlite:///{DB_NAME}"
 
-def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS recommendations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            image TEXT,
-            influencer TEXT,
-            quote TEXT,
-            rating REAL,
-            price_range TEXT,
-            location TEXT,
-            source_url TEXT,
-            article_url TEXT,
-            address TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+connect_args = {"check_same_thread": False}
+engine = create_engine(sqlite_url, connect_args=connect_args)
+
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine)
+
+def get_session():
+    with Session(engine) as session:
+        yield session
 
 if __name__ == "__main__":
-    init_db()
+    create_db_and_tables()
     print("Database initialized.")
+init_db = create_db_and_tables

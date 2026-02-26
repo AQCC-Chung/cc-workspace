@@ -1,7 +1,13 @@
 import React from 'react';
 import './DetailModal.css';
+import { Recommendation } from '../../types';
 
-export default function DetailModal({ item, onClose }) {
+interface DetailModalProps {
+    item: Recommendation | null;
+    onClose: () => void;
+}
+
+export default function DetailModal({ item, onClose }: DetailModalProps) {
     if (!item) return null;
 
     return (
@@ -10,7 +16,7 @@ export default function DetailModal({ item, onClose }) {
                 <button className="modal-close-btn" onClick={onClose}>×</button>
 
                 <div className="modal-image-container">
-                    <img src={item.image} alt={item.name} className="modal-image" />
+                    <img src={item.image || ''} alt={item.name} className="modal-image" />
                     <div className="modal-image-overlay" />
                 </div>
 

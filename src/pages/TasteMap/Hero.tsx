@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import './Hero.css';
 
-export default function Hero({ onSearch }) {
-  const [keyword, setKeyword] = useState('');
+interface HeroProps {
+    onSearch: (keyword: string) => void;
+}
 
-  const handleSearch = (e) => {
+export default function Hero({ onSearch }: HeroProps) {
+  const [keyword, setKeyword] = useState<string>('');
+
+  const handleSearch = (e: FormEvent) => {
     e.preventDefault();
     if (keyword.trim()) {
       onSearch(keyword.trim());

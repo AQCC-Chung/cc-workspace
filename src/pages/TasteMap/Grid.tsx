@@ -1,8 +1,18 @@
 import React from 'react';
 import Card from './Card';
 import './Grid.css';
+import { Recommendation } from '../../types';
 
-export default function Grid({ onCardClick, recommendations, loading, loadingMore, hasMore, onLoadMore }) {
+interface GridProps {
+    onCardClick: (item: Recommendation) => void;
+    recommendations: Recommendation[];
+    loading: boolean;
+    loadingMore: boolean;
+    hasMore: boolean;
+    onLoadMore: () => void;
+}
+
+export default function Grid({ onCardClick, recommendations, loading, loadingMore, hasMore, onLoadMore }: GridProps) {
     if (loading) {
         return (
             <div className="grid-container">

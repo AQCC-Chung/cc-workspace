@@ -1,9 +1,10 @@
 import os
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import sqlite3
 from dotenv import load_dotenv
-import scraper
+from routers.recommendations import router as recommendations_router
+from routers.search import router as search_router
+import database
 
 load_dotenv()
 
@@ -25,31 +26,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/api/recommendations")
-def get_recommendations():
-    conn = sqlite3.connect("influencer.db")
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT * FROM recommendations ORDER BY rating DESC")
-    rows = c.fetchall()
-    conn.close()
-    return [dict(ix) for ix in rows]
-
-@app.get("/api/search")
-def search_recommendations(
-    q: str = Query(..., description="Search keyword"),
-    page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(10, ge=1, le=20, description="Results per page"),
-):
-    """Search endpoint with pagination."""
-    data, has_more = scraper.scrape_data(keyword=q, limit=limit, page=page)
-    scraper.save_to_db(data, append=(page > 1))
-
-    return {
-        'results': data,
-        'has_more': has_more,
-        'page': page,
-    }
+app.include_router(recommendations_router)
+app.include_router(search_router)
 
 @app.get("/health")
 def health_check():
