@@ -256,15 +256,27 @@ ${historyText || '無歷史紀錄'}
     }
   };
 
-  const playMotivationVoice = async () => {
+  const playMotivationVoice = async (activeEx: Exercise, previousSets: SetRecord[], newSet: SetRecord) => {
     if (!ttsEnabled) return;
     try {
-      const ai = getGeminiClient();
-      const randomQuote = MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)];
+      const prompt = `你是一個充滿活力、陽光開朗的年輕健身教練，用語音的方式給予學生一句簡短的鼓勵。
+學生剛完成：${activeEx.name}
+上一組紀錄：${previousSets.map(s => `${s.weight}kg x ${s.reps}下`).join(', ')}
+最新這組：${newSet.weight}kg x ${newSet.reps}下
+判斷他是在進步、穩定輸出還是力竭，給出「一句話」的純文字台詞（不加任何標點符號之外的動作描寫，例如不要[笑聲]或*拍肩*），要讓他聽了很有力氣。
+例如：「太神啦！重量又突破了！保持節奏我們再來！」字數控制在 30 字以內。`;
 
-      const response = await ai.models.generateContent({
+      const scriptResponse = await geminiGenerate({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+
+      const script = scriptResponse.text || "太棒了，保持這個節奏，我們繼續！";
+
+      const ai = getGeminiClient();
+      const ttsResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: randomQuote,
+        contents: script,
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -275,7 +287,7 @@ ${historyText || '無歷史紀錄'}
         },
       });
 
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (base64Audio) {
         const audioData = decodeBase64(base64Audio);
         await playRawPcm(audioData);
@@ -297,12 +309,13 @@ ${historyText || '無歷史紀錄'}
     };
     setCurrentRpe(null);
 
-    setSessions(prev => {
-      const date = getTodayDateString();
-      const existing = prev.find(s => s.exerciseId === activeExercise.id && s.date === date);
+    const date = getTodayDateString();
+    const existingSession = sessions.find(s => s.exerciseId === activeExercise.id && s.date === date);
+    const prevSets = existingSession ? existingSession.sets : [];
 
-      if (existing) {
-        return prev.map(s => s === existing ? { ...s, sets: [...s.sets, newSet] } : s);
+    setSessions(prev => {
+      if (existingSession) {
+        return prev.map(s => s === existingSession ? { ...s, sets: [...s.sets, newSet] } : s);
       } else {
         return [...prev, { id: Math.random().toString(36).substr(2, 9), date, exerciseId: activeExercise.id, sets: [newSet] }];
       }
@@ -316,7 +329,7 @@ ${historyText || '無歷史紀錄'}
     setRestEndTime(endTime);
     setTimeLeft(REST_TIME_SECONDS);
 
-    playMotivationVoice();
+    playMotivationVoice(activeExercise, prevSets, newSet);
     onSetComplete();
   };
 
