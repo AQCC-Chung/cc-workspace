@@ -9,7 +9,7 @@ import {
   Unit,
   WorkoutCategory
 } from './types';
-import { createBackup, downloadBackup, emailBackup, parseBackupFile } from './dataIO';
+import { createBackup, downloadBackup, emailBackup, parseBackupFile, GAS_BACKUP_URL } from './dataIO';
 import {
   INITIAL_EXERCISES,
   REST_TIME_SECONDS,
@@ -148,7 +148,7 @@ const FitTracker: React.FC = () => {
     }
   };
 
-  const hasEmailConfig = !!(import.meta.env.VITE_EMAILJS_SERVICE_ID);
+  const hasEmailConfig = !!GAS_BACKUP_URL;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-10 pt-16 relative">

@@ -1,4 +1,4 @@
-import emailjs from '@emailjs/browser';
+
 import type {
     UserBodyData,
     Exercise,
@@ -17,11 +17,8 @@ export interface FitTrackerBackup {
     cardioRecords: CardioRecord[];
 }
 
-// ─── EmailJS Config ──────────────────────────────────────────
-// User needs to set these after registering at emailjs.com
-const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
-const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '';
-const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '';
+// ─── GAS Backup Config ──────────────────────────────────────────
+export const GAS_BACKUP_URL = 'https://script.google.com/macros/s/AKfycbzIrZVTbwXIig_Xd3_rkZgr9j8W-IalCWie7Mv8JpucVasEqitcopw3WXPRVHl339aU/exec';
 
 // ─── Export ──────────────────────────────────────────────────
 
@@ -63,32 +60,35 @@ export async function emailBackup(
     email: string,
     backup: FitTrackerBackup
 ): Promise<void> {
-    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
-        throw new Error('EmailJS 尚未設定。請在環境變數中設定 VITE_EMAILJS_SERVICE_ID、VITE_EMAILJS_TEMPLATE_ID、VITE_EMAILJS_PUBLIC_KEY。');
+    if (!GAS_BACKUP_URL) {
+        throw new Error('GAS Backup API 網址尚未設定。');
     }
 
     const dateStr = new Date().toISOString().split('T')[0];
-    const jsonString = JSON.stringify(backup, null, 2);
 
-    // Encode JSON to base64 Data URI for EmailJS attachment
-    const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
-    const dataUri = `data:application/json;base64,${base64Data}`;
+    // We send payload as text/plain to bypass CORS preflight issues with GAS.
+    const payload = {
+        email: email,
+        date: dateStr,
+        backupData: backup
+    };
 
-    await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID,
-        {
-            to_email: email,
-            date: dateStr,
-            backup_data: jsonString, // Fallback to raw string text in case attachments aren't configured in EmailJS console
-            total_sessions: backup.weightSessions.length,
-            total_cardio: backup.cardioRecords.length,
-            // If the user configures EmailJS attachments to consume `content`, this will be parsed:
-            content: dataUri,
-            filename: `fittracker-backup-${dateStr}.json`
+    const response = await fetch(GAS_BACKUP_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'text/plain;charset=utf-8',
         },
-        EMAILJS_PUBLIC_KEY
-    );
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error(`伺服器錯誤: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.status === 'error') {
+        throw new Error(`API回傳錯誤: ${result.message}`);
+    }
 }
 
 // ─── Import ──────────────────────────────────────────────────

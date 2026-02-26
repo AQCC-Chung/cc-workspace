@@ -219,7 +219,7 @@ const SettingsModal: React.FC<Props> = ({
                   {isSyncing ? '寄送中...' : 'Email 備份'}
                 </span>
                 <span className="text-[10px] text-emerald-400">
-                  {hasEmailConfig ? '寄送備份到你的信箱' : 'EmailJS 尚未設定'}
+                  {hasEmailConfig ? '寄送備份到你的信箱' : '備份 API 尚未設定'}
                 </span>
               </div>
             </button>
