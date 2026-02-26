@@ -1,7 +1,14 @@
+import { MouseEvent } from 'react';
 import './Card.css';
+import { Recommendation } from '../../types';
 
-export default function Card({ data, onClick }) {
-    const handleSourceClick = (e) => {
+interface CardProps {
+    data: Recommendation;
+    onClick: (item: Recommendation) => void;
+}
+
+export default function Card({ data, onClick }: CardProps) {
+    const handleSourceClick = (e: MouseEvent) => {
         e.stopPropagation();
         if (data.article_url) {
             window.open(data.article_url, '_blank');

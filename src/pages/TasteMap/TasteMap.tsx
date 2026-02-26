@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import Hero from './Hero'
 import Grid from './Grid'
 import DetailModal from './DetailModal'
+import { Recommendation, SearchResult } from '../../types'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export default function TasteMap() {
-    const [selectedItem, setSelectedItem] = useState(null)
-    const [recommendations, setRecommendations] = useState([])
+    const [selectedItem, setSelectedItem] = useState<Recommendation | null>(null)
+    const [recommendations, setRecommendations] = useState<Recommendation[]>([])
     const [loading, setLoading] = useState(true)
     const [loadingMore, setLoadingMore] = useState(false)
     const [hasMore, setHasMore] = useState(false)
@@ -18,7 +19,7 @@ export default function TasteMap() {
         fetchRecommendations(`${API_BASE}/api/recommendations`)
     }, [])
 
-    const fetchRecommendations = (url) => {
+    const fetchRecommendations = (url: string) => {
         setLoading(true)
         setHasMore(false)
         setCurrentPage(1)
