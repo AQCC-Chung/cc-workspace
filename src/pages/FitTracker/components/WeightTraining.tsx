@@ -21,6 +21,7 @@ interface Props {
   sessions: WeightWorkoutSession[];
   setSessions: React.Dispatch<React.SetStateAction<WeightWorkoutSession[]>>;
   onSetComplete: () => void;
+  ttsEnabled: boolean;
 }
 
 const MOTIVATION_QUOTES = [
@@ -45,7 +46,7 @@ const RPE_LEVELS = [
 ];
 
 const WeightTraining: React.FC<Props> = ({
-  unit, setUnit, exercises, setExercises, sessions, setSessions, onSetComplete
+  unit, setUnit, exercises, setExercises, sessions, setSessions, onSetComplete, ttsEnabled
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<WorkoutCategory>('Chest');
   const [activeExercise, setActiveExercise] = useState<Exercise | null>(null);
@@ -246,13 +247,19 @@ ${historyText || '無歷史紀錄'}
       setCoachMessage(response.text || '教練暫時無法回應');
     } catch (e) {
       console.error(e);
-      setCoachMessage('AI 教練暫時無法連線');
+      const msg = (e as any)?.message || '';
+      if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
+        setCoachMessage('API 額度已用完，請等明日重置或到設定頁測試連線');
+      } else {
+        setCoachMessage('AI 教練暫時無法連線');
+      }
     } finally {
       setIsCoachLoading(false);
     }
   };
 
   const playMotivationVoice = async () => {
+    if (!ttsEnabled) return;
     try {
       const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
       const randomQuote = MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)];

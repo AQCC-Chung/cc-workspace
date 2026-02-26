@@ -60,6 +60,14 @@ const FitTracker: React.FC = () => {
   const [showBodyModal, setShowBodyModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('fittracker_tts');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('fittracker_tts', JSON.stringify(ttsEnabled));
+  }, [ttsEnabled]);
 
   // Sync with localStorage
   useEffect(() => {
@@ -206,6 +214,7 @@ const FitTracker: React.FC = () => {
               sessions={weightSessions}
               setSessions={setWeightSessions}
               onSetComplete={startRestTimer}
+              ttsEnabled={ttsEnabled}
             />
           )}
           {activeTab === 'CARDIO' && (
@@ -243,6 +252,8 @@ const FitTracker: React.FC = () => {
           onImport={handleImport}
           isSyncing={isSyncing}
           hasEmailConfig={hasEmailConfig}
+          ttsEnabled={ttsEnabled}
+          setTtsEnabled={setTtsEnabled}
         />
       )}
 
