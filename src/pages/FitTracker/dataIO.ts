@@ -80,10 +80,10 @@ export async function emailBackup(
         {
             to_email: email,
             date: dateStr,
-            backup_data: '如附件 (fittracker-backup.json)',
+            backup_data: jsonString, // Fallback to raw string text in case attachments aren't configured in EmailJS console
             total_sessions: backup.weightSessions.length,
             total_cardio: backup.cardioRecords.length,
-            // EmailJS attachment parameter
+            // If the user configures EmailJS attachments to consume `content`, this will be parsed:
             content: dataUri,
             filename: `fittracker-backup-${dateStr}.json`
         },
