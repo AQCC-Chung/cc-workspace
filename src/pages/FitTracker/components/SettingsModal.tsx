@@ -1,6 +1,6 @@
 
 import React, { useRef, useState } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import { testGeminiConnection } from '../../../utils/gemini';
 
 interface Props {
   userEmail: string;
@@ -40,33 +40,15 @@ const SettingsModal: React.FC<Props> = ({
   };
 
   const checkGeminiQuota = async () => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      setQuotaStatus('error');
-      setQuotaMsg('API Key 未設定');
-      return;
-    }
     setQuotaStatus('checking');
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: '回覆「OK」兩個字即可',
-      });
-      if (response.text) {
-        setQuotaStatus('ok');
-        setQuotaMsg('連線正常，API 額度充足');
-      }
-    } catch (e: any) {
+    const result = await testGeminiConnection();
+
+    if (result.status === 'ok') {
+      setQuotaStatus('ok');
+      setQuotaMsg(result.message);
+    } else {
       setQuotaStatus('error');
-      const msg = e?.message || '';
-      if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
-        setQuotaMsg('API 額度已用完，請等待明日重置或升級付費方案');
-      } else if (msg.includes('401') || msg.includes('API_KEY_INVALID')) {
-        setQuotaMsg('API Key 無效，請重新設定');
-      } else {
-        setQuotaMsg('連線失敗：' + (msg.slice(0, 80)));
-      }
+      setQuotaMsg(result.message);
     }
   };
 

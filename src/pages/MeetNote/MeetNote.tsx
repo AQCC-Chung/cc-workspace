@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, DragEvent, ChangeEvent } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { geminiGenerate } from '../../utils/gemini';
 import './MeetNote.css';
 
 interface MeetingRecord {
@@ -149,17 +149,10 @@ export default function MeetNote() {
     const processAudio = async () => {
         if (!file) return;
 
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-        if (!apiKey) {
-            setError('Gemini API Key 未設定，請到設定頁確認');
-            return;
-        }
-
         setViewState('processing');
         setError('');
 
         try {
-            const ai = new GoogleGenAI({ apiKey });
             const base64Data = await fileToBase64(file);
 
             // Determine MIME type
@@ -167,7 +160,7 @@ export default function MeetNote() {
             if (mimeType === 'audio/x-m4a') mimeType = 'audio/mp4';
             if (!mimeType.startsWith('audio/')) mimeType = 'audio/mpeg';
 
-            const response = await ai.models.generateContent({
+            const response = await geminiGenerate({
                 model: 'gemini-2.5-flash',
                 contents: [
                     {

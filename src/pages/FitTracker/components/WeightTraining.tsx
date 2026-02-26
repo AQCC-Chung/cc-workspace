@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
+import { Modality } from "@google/genai";
+import { geminiGenerate, getGeminiClient } from '../../../utils/gemini';
 import {
   Exercise,
   WeightWorkoutSession,
@@ -205,13 +206,10 @@ const WeightTraining: React.FC<Props> = ({
 
   const askGeminiCoach = async () => {
     if (!activeExercise) return;
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) { setCoachMessage('尚未設定 Gemini API Key'); return; }
 
     setIsCoachLoading(true);
     setCoachMessage(null);
     try {
-      const ai = new GoogleGenAI({ apiKey });
       const history = sessions
         .filter(s => s.exerciseId === activeExercise.id)
         .sort((a, b) => b.date.localeCompare(a.date))
@@ -240,7 +238,7 @@ ${historyText || '無歷史紀錄'}
 
 回覆控制在 80 字以內。`;
 
-      const response = await ai.models.generateContent({
+      const response = await geminiGenerate({
         model: 'gemini-2.5-flash',
         contents: prompt,
       });
@@ -261,7 +259,7 @@ ${historyText || '無歷史紀錄'}
   const playMotivationVoice = async () => {
     if (!ttsEnabled) return;
     try {
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+      const ai = getGeminiClient();
       const randomQuote = MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)];
 
       const response = await ai.models.generateContent({
