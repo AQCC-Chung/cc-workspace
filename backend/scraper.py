@@ -537,7 +537,6 @@ def lookup_google_place(place_name, city='台北'):
                     photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_ref}&key={GOOGLE_API_KEY}"
 
             place_id = place.get('place_id', '')
-            from urllib.parse import quote
             if place_id:
                 maps_url = f"https://www.google.com/maps/search/?api=1&query={quote(name)}&query_place_id={place_id}"
             else:
@@ -626,7 +625,6 @@ def google_places_direct_search(keyword, city='台北', limit=10):
                     photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_ref}&key={GOOGLE_API_KEY}"
 
             place_id = place.get('place_id', '')
-            from urllib.parse import quote
             if place_id:
                 maps_url = f"https://www.google.com/maps/search/?api=1&query={quote(name)}&query_place_id={place_id}"
             else:
