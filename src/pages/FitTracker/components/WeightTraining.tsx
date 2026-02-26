@@ -37,6 +37,13 @@ const RPE_LABELS: Record<number, string> = {
   9: '極重', 10: '極限',
 };
 
+// RPE post-exercise: 3 levels
+const RPE_LEVELS = [
+  { emoji: '😊', label: '輕鬆', value: 4 },
+  { emoji: '😐', label: '普通', value: 6 },
+  { emoji: '😫', label: '吃力', value: 9 },
+];
+
 const WeightTraining: React.FC<Props> = ({
   unit, setUnit, exercises, setExercises, sessions, setSessions, onSetComplete
 }) => {
@@ -52,6 +59,8 @@ const WeightTraining: React.FC<Props> = ({
   const [currentWeight, setCurrentWeight] = useState<number>(40);
   const [currentReps, setCurrentReps] = useState<number>(10);
   const [currentRpe, setCurrentRpe] = useState<number | null>(null);
+  const [showRpePopup, setShowRpePopup] = useState(false);
+  const [pendingCloseExercise, setPendingCloseExercise] = useState<Exercise | null>(null);
 
   // Smart Coach: base weight setup
   const [showBaseWeightSetup, setShowBaseWeightSetup] = useState(false);
@@ -151,6 +160,35 @@ const WeightTraining: React.FC<Props> = ({
     } else {
       setActiveExercise(ex);
     }
+  };
+
+  // Close exercise: check if we should show RPE popup
+  const handleCloseExercise = () => {
+    const today = getTodayDateString();
+    const hasTodaySets = sessions.some(s => s.exerciseId === activeExercise?.id && s.date === today && s.sets.length > 0);
+    if (hasTodaySets && activeExercise) {
+      setPendingCloseExercise(activeExercise);
+      setShowRpePopup(true);
+    }
+    setActiveExercise(null);
+    setRestEndTime(null);
+    setCoachMessage(null);
+  };
+
+  const handleRpeSubmit = (rpeValue: number | null) => {
+    if (rpeValue !== null && pendingCloseExercise) {
+      // Save RPE to the last set of today's session
+      setSessions(prev => prev.map(s => {
+        if (s.exerciseId === pendingCloseExercise.id && s.date === getTodayDateString() && s.sets.length > 0) {
+          const updatedSets = [...s.sets];
+          updatedSets[updatedSets.length - 1] = { ...updatedSets[updatedSets.length - 1], rpe: rpeValue };
+          return { ...s, sets: updatedSets };
+        }
+        return s;
+      }));
+    }
+    setShowRpePopup(false);
+    setPendingCloseExercise(null);
   };
 
   const handleSaveBaseWeight = () => {
@@ -372,24 +410,20 @@ ${historyText || '無歷史紀錄'}
 
               <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-full">W1</span>
-                  <span><strong>神經適應</strong>：基準重量 × 4-6 下</span>
+                  <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">W1</span>
+                  <span><strong>肌肥大</strong>：75% 基準重量 × 8-12 下 × 4 組</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">W2</span>
-                  <span><strong>肌肥大</strong>：80% 重量 × 10-12 下</span>
+                  <span className="text-[10px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-full">W2</span>
+                  <span><strong>力量週</strong>：基準重量 × 4-6 下 × 4 組</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full">W3</span>
-                  <span><strong>耐力週</strong>：75% 重量 × 15 下</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full">W4</span>
-                  <span><strong>減量週</strong>：50% 重量 × 10 下</span>
+                  <span><strong>減量週</strong>：50% 基準重量 × 8-10 下 × 2 組</span>
                 </div>
               </div>
 
-              <p>W1 如果能做到 <strong>8 下以上</strong>，下個循環會自動增加重量（槓鈴 +5kg、啞鈴/器械 +2.5kg）。</p>
+              <p>W2 力量週做到 <strong>6 下以上</strong>，下個循環會自動增加重量（槓鈴 +5kg、啞鈴/器械 +2.5kg）。</p>
             </div>
 
             <button
@@ -477,13 +511,13 @@ ${historyText || '無歷史紀錄'}
       {activeExercise && !showBaseWeightSetup && (
         <div
           className="fixed inset-0 z-[105] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-md animate-in fade-in"
-          onClick={() => { setActiveExercise(null); setRestEndTime(null); setCoachMessage(null); }}
+          onClick={handleCloseExercise}
         >
           <div
             className="bg-white/70 backdrop-blur-2xl border border-white/20 w-full max-w-xl max-h-[90vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-[0_32px_64px_-15px_rgba(0,0,0,0.3)] flex flex-col animate-in slide-in-from-bottom-10 duration-500"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Sticky Header */}
+            {/* Header */}
             <div className="flex justify-between items-center px-6 pt-6 pb-3 shrink-0">
               <div className="space-y-1 min-w-0 flex-1">
                 <h3 className="text-xl font-black text-slate-900 truncate">{activeExercise.name}</h3>
@@ -495,58 +529,41 @@ ${historyText || '無歷史紀錄'}
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => { setActiveExercise(null); setRestEndTime(null); setCoachMessage(null); }}
+              <button onClick={handleCloseExercise}
                 className="w-10 h-10 bg-white/50 border border-white/40 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 transition-all shrink-0 ml-3"
               >✕</button>
             </div>
 
-            {/* Scrollable Body */}
+            {/* Body */}
             <div className="overflow-y-auto flex-1 px-6 pb-6 space-y-4">
 
-              {/* Smart Coach Card */}
+              {/* Smart Coach — one-line compact */}
               {recommendation && (
-                <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 p-4 rounded-2xl border border-indigo-200/50 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span>🧠</span>
-                      <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Smart Coach</span>
-                    </div>
-                    <span className="text-[9px] font-black bg-indigo-500/20 text-indigo-700 px-2 py-0.5 rounded-full">
-                      C{recommendation.cycleNumber}-{recommendation.weekType} {recommendation.weekLabel}
-                    </span>
-                  </div>
-                  <p className="text-base font-black text-slate-800">🎯 {getProgressSummary(recommendation)}</p>
-                  {recommendation.lastW1 && (
-                    <p className="text-[10px] font-bold text-slate-500">📊 上次 W1：{recommendation.lastW1.weight}kg × {recommendation.lastW1.reps} 下（{recommendation.lastW1.date}）</p>
-                  )}
-                  {recommendation.shouldProgress && (
-                    <p className="text-[10px] font-black text-emerald-600">💪 {recommendation.progressInfo}</p>
-                  )}
+                <div className="flex items-center gap-2 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 px-4 py-3 rounded-2xl border border-indigo-200/50">
+                  <span>🧠</span>
+                  <span className="text-[10px] font-black bg-indigo-500/20 text-indigo-700 px-2 py-0.5 rounded-full">{recommendation.weekType} {recommendation.weekLabel}</span>
+                  <span className="text-sm font-black text-slate-800 flex-1">{getProgressSummary(recommendation)}</span>
+                  {recommendation.shouldProgress && <span className="text-[10px]">💪</span>}
                 </div>
               )}
 
               {lastWorkout && !recommendation && (
-                <div className="bg-white/40 p-4 rounded-2xl border border-white/50 flex justify-between items-center">
-                  <div>
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">上次表現</p>
-                    <p className="text-lg font-black text-indigo-700">
-                      {unit === 'LBS' ? kgToLbs(lastWorkout.sets[0].weight) : lastWorkout.sets[0].weight} {unit} × {lastWorkout.sets[0].reps} 次
-                    </p>
-                  </div>
-                  <p className="text-[10px] font-bold text-slate-400">{lastWorkout.date}</p>
+                <div className="flex items-center justify-between bg-white/40 px-4 py-3 rounded-2xl border border-white/50">
+                  <span className="text-[10px] font-black text-slate-400">上次</span>
+                  <span className="text-sm font-black text-indigo-700">
+                    {unit === 'LBS' ? kgToLbs(lastWorkout.sets[0].weight) : lastWorkout.sets[0].weight}{unit} × {lastWorkout.sets[0].reps}
+                  </span>
+                  <span className="text-[10px] text-slate-400">{lastWorkout.date}</span>
                 </div>
               )}
 
               {/* Weight & Reps */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">訓練重量 ({unit})</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">重量 ({unit})</label>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setCurrentWeight(w => Math.max(0, w - 1))} className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
-                    <input
-                      type="number" inputMode="decimal"
-                      value={currentWeight}
+                    <input type="number" inputMode="decimal" value={currentWeight}
                       onChange={(e) => setCurrentWeight(parseFloat(e.target.value) || 0)}
                       className="flex-1 min-w-0 bg-white/50 py-3 rounded-2xl text-2xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 border border-white/40 text-center shadow-inner"
                     />
@@ -557,9 +574,7 @@ ${historyText || '無歷史紀錄'}
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">次數</label>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setCurrentReps(r => Math.max(1, r - 1))} className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
-                    <input
-                      type="number" inputMode="numeric"
-                      value={currentReps}
+                    <input type="number" inputMode="numeric" value={currentReps}
                       onChange={(e) => setCurrentReps(parseInt(e.target.value) || 0)}
                       className="flex-1 min-w-0 bg-white/50 py-3 rounded-2xl text-2xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 border border-white/40 text-center shadow-inner"
                     />
@@ -567,42 +582,6 @@ ${historyText || '無歷史紀錄'}
                   </div>
                 </div>
               </div>
-
-              {/* RPE */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">自覺疲勞度 (RPE)</label>
-                  {currentRpe && (
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${currentRpe >= 9 ? 'bg-red-100 text-red-600' : currentRpe >= 7 ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'
-                      }`}>{RPE_LABELS[currentRpe]}</span>
-                  )}
-                </div>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => (
-                    <button key={v}
-                      onClick={() => setCurrentRpe(currentRpe === v ? null : v)}
-                      className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${currentRpe === v
-                        ? v >= 9 ? 'bg-red-500 text-white shadow-lg' : v >= 7 ? 'bg-amber-500 text-white shadow-lg' : 'bg-indigo-500 text-white shadow-lg'
-                        : 'bg-white/40 text-slate-400 border border-white/30'
-                        }`}
-                    >{v}</button>
-                  ))}
-                </div>
-              </div>
-
-              {/* AI Coach */}
-              <button
-                onClick={askGeminiCoach}
-                disabled={isCoachLoading}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-xs font-black bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-200/50 text-purple-700 active:scale-95 disabled:opacity-50"
-              >
-                {isCoachLoading ? (<>⏳ 教練思考中...</>) : (<>🤖 問問 AI 教練</>)}
-              </button>
-              {coachMessage && (
-                <div className="bg-purple-50/80 border border-purple-200/50 rounded-2xl p-3">
-                  <p className="text-[11px] font-bold text-purple-800 leading-relaxed whitespace-pre-line">{coachMessage}</p>
-                </div>
-              )}
 
               {/* Save / Timer */}
               {!restEndTime ? (
@@ -620,6 +599,18 @@ ${historyText || '無歷史紀錄'}
                     <button onClick={skipRest} className="px-6 py-2.5 bg-white/50 text-slate-700 rounded-xl font-black text-xs border border-white/40">跳過</button>
                     <button onClick={addExtraRest} className="px-6 py-2.5 bg-indigo-500/20 text-indigo-700 rounded-xl font-black text-xs border border-white/40">+30s</button>
                   </div>
+                </div>
+              )}
+
+              {/* AI Coach */}
+              <button onClick={askGeminiCoach} disabled={isCoachLoading}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-xs font-black bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-200/50 text-purple-700 active:scale-95 disabled:opacity-50"
+              >
+                {isCoachLoading ? (<>⏳ 教練思考中...</>) : (<>🤖 問問 AI 教練</>)}
+              </button>
+              {coachMessage && (
+                <div className="bg-purple-50/80 border border-purple-200/50 rounded-2xl p-3">
+                  <p className="text-[11px] font-bold text-purple-800 leading-relaxed whitespace-pre-line">{coachMessage}</p>
                 </div>
               )}
 
@@ -641,7 +632,7 @@ ${historyText || '無歷史紀錄'}
                 </div>
               )}
 
-            </div>{/* end scrollable body */}
+            </div>
           </div>
         </div>
       )}
@@ -715,6 +706,30 @@ ${historyText || '無歷史紀錄'}
                 開始訓練
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* RPE Post-Exercise Popup */}
+      {showRpePopup && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-xs rounded-[2.5rem] shadow-2xl p-8 space-y-6 animate-in zoom-in-95 duration-200">
+            <div className="text-center space-y-2">
+              <h2 className="text-lg font-black text-slate-800">今天這個動作感覺如何？</h2>
+              <p className="text-[11px] text-slate-400">{pendingCloseExercise?.name}</p>
+            </div>
+            <div className="flex gap-3">
+              {RPE_LEVELS.map(level => (
+                <button
+                  key={level.value}
+                  onClick={() => handleRpeSubmit(level.value)}
+                  className="flex-1 flex flex-col items-center gap-2 py-4 rounded-2xl border-2 border-slate-100 hover:border-indigo-400 hover:bg-indigo-50 transition-all active:scale-95"
+                >
+                  <span className="text-3xl">{level.emoji}</span>
+                  <span className="text-xs font-black text-slate-600">{level.label}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => handleRpeSubmit(null)} className="w-full py-3 text-sm font-bold text-slate-400">跳過</button>
           </div>
         </div>
       )}

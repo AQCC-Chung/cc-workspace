@@ -3,7 +3,7 @@ import { INCREMENT_BARBELL, INCREMENT_DUMBBELL, INCREMENT_MACHINE } from './cons
 
 // ─── Types ───────────────────────────────────────────────────
 
-export type WeekType = 'W1' | 'W2' | 'W3' | 'W4';
+export type WeekType = 'W1' | 'W2' | 'W3';
 
 export interface CycleRecommendation {
     cycleNumber: number;
@@ -15,10 +15,10 @@ export interface CycleRecommendation {
     targetSets: number;
     shouldProgress: boolean;
     progressInfo?: string;
-    lastW1?: { weight: number; reps: number; date: string };
+    lastW2?: { weight: number; reps: number; date: string };
 }
 
-// ─── Config ──────────────────────────────────────────────────
+// ─── Config: Plan B 三週循環 ─────────────────────────────────
 
 const WEEK_CONFIG: Record<WeekType, {
     label: string;
@@ -27,13 +27,13 @@ const WEEK_CONFIG: Record<WeekType, {
     repsMax: number;
     sets: number;
 }> = {
-    W1: { label: '神經適應', multiplier: 1.0, repsMin: 4, repsMax: 6, sets: 4 },
-    W2: { label: '肌肥大', multiplier: 0.8, repsMin: 10, repsMax: 12, sets: 4 },
-    W3: { label: '耐力週', multiplier: 0.75, repsMin: 15, repsMax: 15, sets: 3 },
-    W4: { label: '減量週', multiplier: 0.5, repsMin: 10, repsMax: 10, sets: 2 },
+    W1: { label: '肌肥大', multiplier: 0.75, repsMin: 8, repsMax: 12, sets: 4 },
+    W2: { label: '力量週', multiplier: 1.0, repsMin: 4, repsMax: 6, sets: 4 },
+    W3: { label: '減量週', multiplier: 0.50, repsMin: 8, repsMax: 10, sets: 2 },
 };
 
-const WEEK_ORDER: WeekType[] = ['W1', 'W2', 'W3', 'W4'];
+const CYCLE_LENGTH = 3;
+const WEEK_ORDER: WeekType[] = ['W1', 'W2', 'W3'];
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -46,16 +46,12 @@ export function getIncrement(type?: EquipmentType): number {
     }
 }
 
-/**
- * 取得某動作的所有歷史 session，按日期排序（舊→新）
- * 每個日期只算一次（同一天多次訓練視為同一個 session）
- */
+/** 取得某動作的歷史 session，按日期排序（舊→新），每日去重 */
 function getExerciseHistory(exerciseId: string, sessions: WeightWorkoutSession[]) {
     const filtered = sessions
         .filter(s => s.exerciseId === exerciseId && s.sets.length > 0)
         .sort((a, b) => a.date.localeCompare(b.date));
 
-    // 每個日期只保留一個（去重）
     const seen = new Set<string>();
     return filtered.filter(s => {
         if (seen.has(s.date)) return false;
@@ -64,23 +60,11 @@ function getExerciseHistory(exerciseId: string, sessions: WeightWorkoutSession[]
     });
 }
 
-/**
- * 從歷史推算目前在第幾個循環的第幾週
- * 邏輯：cycleStartDate 之後每 4 個不同日期的 session 為一個 cycle
- */
-function getCurrentWeekIndex(
-    exercise: Exercise,
-    sessions: WeightWorkoutSession[]
-): number {
+function getCurrentWeekIndex(exercise: Exercise, sessions: WeightWorkoutSession[]): number {
     const history = getExerciseHistory(exercise.id, sessions);
-
-    if (!exercise.cycleStartDate || history.length === 0) {
-        return 0; // W1
-    }
-
-    // 只算 cycleStartDate 之後的 session
-    const relevantSessions = history.filter(s => s.date >= exercise.cycleStartDate!);
-    return relevantSessions.length % 4;
+    if (!exercise.cycleStartDate || history.length === 0) return 0;
+    const relevant = history.filter(s => s.date >= exercise.cycleStartDate!);
+    return relevant.length % CYCLE_LENGTH;
 }
 
 // ─── Main API ────────────────────────────────────────────────
@@ -96,27 +80,24 @@ export function getRecommendation(
     const weekType = WEEK_ORDER[weekIndex];
     const config = WEEK_CONFIG[weekType];
 
-    // 計算循環編號
     const relevantSessions = exercise.cycleStartDate
         ? history.filter(s => s.date >= exercise.cycleStartDate!)
         : history;
-    const cycleNumber = Math.floor(relevantSessions.length / 4) + 1;
+    const cycleNumber = Math.floor(relevantSessions.length / CYCLE_LENGTH) + 1;
 
-    // 計算基準重量（考慮進階）
     let baseWeight = exercise.baseWeight;
 
-    // 檢查上一個完整循環的 W1 表現來判斷是否進階
-    const lastW1Session = findLastW1Session(exercise, sessions);
+    // 進階判斷：找最近 W2（力量週），max reps ≥ 6 時加重
+    const lastW2Session = findLastWeekSession(exercise, sessions, 1); // W2 = index 1
     let shouldProgress = false;
     let progressInfo: string | undefined;
 
-    if (lastW1Session) {
-        const maxReps = Math.max(...lastW1Session.sets.map(s => s.reps));
-        if (maxReps >= 8) {
+    if (lastW2Session) {
+        const maxReps = Math.max(...lastW2Session.sets.map(s => s.reps));
+        if (maxReps >= 6) {
             const increment = getIncrement(exercise.equipmentType);
             shouldProgress = true;
-            progressInfo = `上次 W1 做到 ${maxReps} 下 (≥8)，基準重量 +${increment}kg`;
-            // 只在新循環的 W1 時自動加重
+            progressInfo = `力量週做到 ${maxReps} 下 (≥6)，下循環 +${increment}kg`;
             if (weekIndex === 0) {
                 baseWeight += increment;
             }
@@ -135,23 +116,21 @@ export function getRecommendation(
         targetSets: config.sets,
         shouldProgress,
         progressInfo,
-        lastW1: lastW1Session
+        lastW2: lastW2Session
             ? {
-                weight: lastW1Session.sets[0].weight,
-                reps: Math.max(...lastW1Session.sets.map(s => s.reps)),
-                date: lastW1Session.date,
+                weight: lastW2Session.sets[0].weight,
+                reps: Math.max(...lastW2Session.sets.map(s => s.reps)),
+                date: lastW2Session.date,
             }
             : undefined,
     };
 }
 
-/**
- * 找到最近一次 W1 training session
- * W1 是每 4 次 session 中的第 0 次
- */
-function findLastW1Session(
+/** 找最近一次指定 week index 的 session */
+function findLastWeekSession(
     exercise: Exercise,
-    sessions: WeightWorkoutSession[]
+    sessions: WeightWorkoutSession[],
+    targetWeekIndex: number
 ): WeightWorkoutSession | null {
     const history = getExerciseHistory(exercise.id, sessions);
     if (history.length === 0) return null;
@@ -159,16 +138,13 @@ function findLastW1Session(
     const startDate = exercise.cycleStartDate || history[0].date;
     const relevant = history.filter(s => s.date >= startDate);
 
-    // 找最後一個 W1 位置（index % 4 === 0 的 session）
     for (let i = relevant.length - 1; i >= 0; i--) {
-        if (i % 4 === 0) return relevant[i];
+        if (i % CYCLE_LENGTH === targetWeekIndex) return relevant[i];
     }
     return null;
 }
 
-/**
- * 取得進度概要字串（給 UI 顯示）
- */
+/** 進度概要字串 */
 export function getProgressSummary(rec: CycleRecommendation): string {
     const reps = rec.targetRepsMin === rec.targetRepsMax
         ? `${rec.targetRepsMin} 下`
