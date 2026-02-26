@@ -223,20 +223,20 @@ const WeightTraining: React.FC<Props> = ({
         ? `目前週期：C${recommendation.cycleNumber}-${recommendation.weekType}（${recommendation.weekLabel}），目標：${getProgressSummary(recommendation)}`
         : '未啟用週期訓練';
 
-      const prompt = `你是一位專業重量訓練教練，用繁體中文回答。語氣簡短有力，像教練在場邊指導。
+      const prompt = `你是一位專業且熱情鼓勵學生的重量訓練教練，用繁體中文回答。適度給予稱讚。
 
 動作：${activeExercise.name}（${activeExercise.equipmentType || '未分類'}）
 ${recText}
 
-近 5 次紀錄：
+近 5 次紀錄（不一定有RPE，主要看重量與次數變化）：
 ${historyText || '無歷史紀錄'}
 
-請給出：
-1. 一句激勵或提醒（根據 RPE 趨勢判斷狀態）
-2. 今天的訓練建議（重量/組數調整）
-3. 一個該動作的技術要點
+請簡短給出以下三點（不用列點前綴，順順講出來即可）：
+1. 一句熱血激勵的話（根據近期的重量/次數變化稍微提一下進步或維持）
+2. 今天的訓練建議（專注在感受度、重量維持或小幅突破，不要給太大的壓力）
+3. 一個該動作最關鍵的技術要點（例如：注意收核心、手肘微彎之類的）
 
-回覆控制在 80 字以內。`;
+回覆控制在 80 字以內，語氣要像朋友般鼓勵。`;
 
       const response = await geminiGenerate({
         model: 'gemini-2.5-flash',
