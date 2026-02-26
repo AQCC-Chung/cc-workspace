@@ -1,0 +1,55 @@
+INFO:     Started server process [10619]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:57988 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38340 - "GET /api/recommendations HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:35996 - "GET /api/recommendations HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:35996 - "GET /api/recommendations/ HTTP/1.1" 200 OK
+
+============================================================
+Starting deep scraper for: 'test_async_integration' (target: 2, page: 1)
+============================================================
+
+[City detected] 台北
+[Chinese query] 台北 推薦 test_async_integration
+[English query] Taipei best recommended test_async_integration
+[Step 1] Searching DuckDuckGo for articles: '台北 推薦 test_async_integration'
+[Step 1] Searching DuckDuckGo for articles: 'Taipei best recommended test_async_integration'
+  Found 2 articles
+  Found 2 articles
+[Bilingual search] 2 zh + 2 en = 4 total unique articles
+[Step 2] Scraping article: https://www.testsprite.com/use-cases/zh-Hant/the-best-api-integration-testing-to...
+[Step 2] Scraping article: https://neuronglowtech.com/about.html...
+[Step 2] Scraping article: https://dasroot.net/posts/2026/02/python-agent-testing-best-practices-tools/...
+[Step 2] Scraping article: https://learn.microsoft.com/en-us/aspnet/core/test/integration-tests?view=aspnet...
+  Extracted 5 places: ['Introduction to integration tests', 'ASP.NET Core integration tests', 'Test app prerequisites']...
+  Extracted 5 places: ['什麼是API整合測試工具？', 'TestSprite', 'TestSprite (2026)：AI驅動的API整合測試與驗證']...
+  Extracted 5 places: ['Understanding Python Agent Testing#', 'Testing Frameworks and Tools#', 'Mocking External Dependencies#']...
+  Failed to scrape article:
+
+[Summary] Collected 9 unique place names from articles
+
+[Step 3] Looking up 6 places via Google API...
+  Google Places: No result for 'Understanding Python Agent Testing#' (status: REQUEST_DENIED)
+  Google Places: No result for 'Postman (2026)：端到端API協作與測試' (status: REQUEST_DENIED)
+  Google Places: No result for 'TestSprite (2026)：AI驅動的API整合測試與驗證' (status: REQUEST_DENIED)
+  Google Places: No result for 'Postman' (status: REQUEST_DENIED)
+  Google Places: No result for '什麼是API整合測試工具？' (status: REQUEST_DENIED)
+  Google Places: No result for 'TestSprite' (status: REQUEST_DENIED)
+
+[Fallback] Only 0 results, need 3 more from Google Places directly
+
+[Fallback] Google Places direct search: '台北 推薦 test_async_integration' in 台北
+  Google Places direct: status=REQUEST_DENIED
+
+============================================================
+Deep scraper complete: 0 total, returning 0 (page 1)
+============================================================
+
+Saved 0 recommendations to database.
+INFO:     127.0.0.1:33412 - "GET /api/search?q=test_async_integration&limit=2 HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [10619]
