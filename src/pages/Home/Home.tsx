@@ -32,7 +32,7 @@ const FEATURES = [
         desc: '上傳錄音檔，自動轉逐字稿並產生會議摘要。',
         to: '/meetnote',
         accent: 'var(--accent-purple)',
-        ready: false,
+        ready: true,
     },
 ]
 
