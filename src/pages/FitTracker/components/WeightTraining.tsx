@@ -264,7 +264,7 @@ ${historyText || '無歷史紀錄'}
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `請用活潑、開朗且陽光的年輕男生嗓音說：${randomQuote}` }] }],
+        contents: randomQuote,
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
