@@ -216,7 +216,7 @@ ${historyText || '無歷史紀錄'}
 
   const playMotivationVoice = async () => {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
       const randomQuote = MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)];
 
       const response = await ai.models.generateContent({
@@ -474,196 +474,174 @@ ${historyText || '無歷史紀錄'}
         </div>
       )}
 
-      {activeExercise && (
+      {activeExercise && !showBaseWeightSetup && (
         <div
           className="fixed inset-0 z-[105] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-md animate-in fade-in"
-          onClick={() => { setActiveExercise(null); setRestEndTime(null); }}
+          onClick={() => { setActiveExercise(null); setRestEndTime(null); setCoachMessage(null); }}
         >
           <div
-            className="bg-white/70 backdrop-blur-2xl border border-white/20 w-full max-w-xl rounded-t-[3rem] sm:rounded-[3rem] shadow-[0_32px_64px_-15px_rgba(0,0,0,0.3)] p-8 space-y-8 animate-in slide-in-from-bottom-10 duration-500"
+            className="bg-white/70 backdrop-blur-2xl border border-white/20 w-full max-w-xl max-h-[90vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-[0_32px_64px_-15px_rgba(0,0,0,0.3)] flex flex-col animate-in slide-in-from-bottom-10 duration-500"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-start">
-              <div className="space-y-2">
-                <h3 className="text-2xl font-black text-slate-900 drop-shadow-sm">{activeExercise.name}</h3>
+            {/* Sticky Header */}
+            <div className="flex justify-between items-center px-6 pt-6 pb-3 shrink-0">
+              <div className="space-y-1 min-w-0 flex-1">
+                <h3 className="text-xl font-black text-slate-900 truncate">{activeExercise.name}</h3>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black bg-indigo-500/20 text-indigo-700 px-3 py-1 rounded-full uppercase tracking-widest">{CATEGORIES_CN[activeExercise.category]}</span>
-                  <div className="flex bg-white/40 p-0.5 rounded-xl border border-white/30 backdrop-blur-md">
+                  <div className="flex bg-white/40 p-0.5 rounded-xl border border-white/30">
                     <button onClick={() => setUnit('KG')} className={`px-3 py-1 rounded-lg text-[9px] font-black transition-all ${unit === 'KG' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600'}`}>KG</button>
                     <button onClick={() => setUnit('LBS')} className={`px-3 py-1 rounded-lg text-[9px] font-black transition-all ${unit === 'LBS' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600'}`}>LBS</button>
                   </div>
                 </div>
               </div>
               <button
-                onClick={() => { setActiveExercise(null); setRestEndTime(null); }}
-                className="w-12 h-12 bg-white/50 backdrop-blur-md border border-white/40 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 transition-all hover:rotate-90"
-              >
-                ✕
-              </button>
+                onClick={() => { setActiveExercise(null); setRestEndTime(null); setCoachMessage(null); }}
+                className="w-10 h-10 bg-white/50 border border-white/40 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 transition-all shrink-0 ml-3"
+              >✕</button>
             </div>
 
-            <div className="grid grid-cols-2 gap-8">
+            {/* Scrollable Body */}
+            <div className="overflow-y-auto flex-1 px-6 pb-6 space-y-4">
+
               {/* Smart Coach Card */}
               {recommendation && (
-                <div className="col-span-2 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 backdrop-blur-md p-5 rounded-[2rem] border border-indigo-200/50 shadow-sm space-y-3">
+                <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 p-4 rounded-2xl border border-indigo-200/50 space-y-2">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">🧠</span>
+                      <span>🧠</span>
                       <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Smart Coach</span>
                     </div>
-                    <span className="text-[9px] font-black bg-indigo-500/20 text-indigo-700 px-3 py-1 rounded-full">
+                    <span className="text-[9px] font-black bg-indigo-500/20 text-indigo-700 px-2 py-0.5 rounded-full">
                       C{recommendation.cycleNumber}-{recommendation.weekType} {recommendation.weekLabel}
                     </span>
                   </div>
-                  <p className="text-lg font-black text-slate-800">
-                    🎯 {getProgressSummary(recommendation)}
-                  </p>
+                  <p className="text-base font-black text-slate-800">🎯 {getProgressSummary(recommendation)}</p>
                   {recommendation.lastW1 && (
-                    <p className="text-[10px] font-bold text-slate-500">
-                      📊 上次 W1：{recommendation.lastW1.weight}kg × {recommendation.lastW1.reps} 下（{recommendation.lastW1.date}）
-                    </p>
+                    <p className="text-[10px] font-bold text-slate-500">📊 上次 W1：{recommendation.lastW1.weight}kg × {recommendation.lastW1.reps} 下（{recommendation.lastW1.date}）</p>
                   )}
                   {recommendation.shouldProgress && (
-                    <p className="text-[10px] font-black text-emerald-600">
-                      💪 {recommendation.progressInfo}
-                    </p>
+                    <p className="text-[10px] font-black text-emerald-600">💪 {recommendation.progressInfo}</p>
                   )}
                 </div>
               )}
 
               {lastWorkout && !recommendation && (
-                <div className="col-span-2 bg-white/40 backdrop-blur-md p-5 rounded-[2rem] border border-white/50 flex justify-between items-center shadow-sm">
+                <div className="bg-white/40 p-4 rounded-2xl border border-white/50 flex justify-between items-center">
                   <div>
                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">上次表現</p>
                     <p className="text-lg font-black text-indigo-700">
                       {unit === 'LBS' ? kgToLbs(lastWorkout.sets[0].weight) : lastWorkout.sets[0].weight} {unit} × {lastWorkout.sets[0].reps} 次
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-400">{lastWorkout.date}</p>
-                  </div>
+                  <p className="text-[10px] font-bold text-slate-400">{lastWorkout.date}</p>
                 </div>
               )}
 
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">訓練重量 ({unit})</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setCurrentWeight(w => Math.max(0, w - (unit === 'KG' ? 2.5 : 5)))} className="w-12 h-12 bg-white/60 backdrop-blur-md rounded-2xl text-xl font-black text-slate-600 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={currentWeight}
-                    onChange={(e) => setCurrentWeight(parseFloat(e.target.value) || 0)}
-                    className="flex-1 bg-white/50 backdrop-blur-md p-5 rounded-[2rem] text-3xl font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 border border-white/40 text-center transition-all shadow-inner"
-                  />
-                  <button onClick={() => setCurrentWeight(w => w + (unit === 'KG' ? 2.5 : 5))} className="w-12 h-12 bg-white/60 backdrop-blur-md rounded-2xl text-xl font-black text-slate-600 border border-white/40 active:scale-90 transition-all flex items-center justify-center">+</button>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">次數</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setCurrentReps(r => Math.max(1, r - 1))} className="w-12 h-12 bg-white/60 backdrop-blur-md rounded-2xl text-xl font-black text-slate-600 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={currentReps}
-                    onChange={(e) => setCurrentReps(parseInt(e.target.value) || 0)}
-                    className="flex-1 bg-white/50 backdrop-blur-md p-5 rounded-[2rem] text-3xl font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 border border-white/40 text-center transition-all shadow-inner"
-                  />
-                  <button onClick={() => setCurrentReps(r => r + 1)} className="w-12 h-12 bg-white/60 backdrop-blur-md rounded-2xl text-xl font-black text-slate-600 border border-white/40 active:scale-90 transition-all flex items-center justify-center">+</button>
-                </div>
-              </div>
-            </div>
-
-            {/* RPE 自覺疲勞度 */}
-            <div className="pt-2 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">自覺疲勞度 (RPE)</label>
-                {currentRpe && (
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${currentRpe >= 9 ? 'bg-red-100 text-red-600' : currentRpe >= 7 ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'
-                    }`}>
-                    {RPE_LABELS[currentRpe]}
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => (
-                  <button
-                    key={v}
-                    onClick={() => setCurrentRpe(currentRpe === v ? null : v)}
-                    className={`flex-1 py-2.5 rounded-xl text-[10px] font-black transition-all flex flex-col items-center gap-0.5 ${currentRpe === v
-                      ? v >= 9 ? 'bg-red-500 text-white shadow-lg' : v >= 7 ? 'bg-amber-500 text-white shadow-lg' : 'bg-indigo-500 text-white shadow-lg'
-                      : 'bg-white/40 text-slate-400 border border-white/30'
-                      }`}
-                  >
-                    <span>{v}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Gemini Coach Interactive */}
-            <div className="pt-1">
-              <button
-                onClick={askGeminiCoach}
-                disabled={isCoachLoading}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-black transition-all bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-200/50 text-purple-700 hover:from-purple-500/20 hover:to-indigo-500/20 active:scale-95 disabled:opacity-50"
-              >
-                {isCoachLoading ? (
-                  <><span className="animate-spin">⏳</span> 教練思考中...</>
-                ) : (
-                  <><span>🤖</span> 問問 AI 教練</>
-                )}
-              </button>
-              {coachMessage && (
-                <div className="mt-2 bg-purple-50/80 backdrop-blur-sm border border-purple-200/50 rounded-2xl p-4">
-                  <p className="text-[11px] font-bold text-purple-800 leading-relaxed whitespace-pre-line">{coachMessage}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-2">
-              {!restEndTime ? (
-                <button
-                  onClick={handleAddSet}
-                  className="w-full bg-indigo-600/90 hover:bg-indigo-600 text-white py-6 rounded-[2rem] font-black text-xl shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)] active:scale-95 transition-all backdrop-blur-md"
-                >
-                  儲存本組進度
-                </button>
-              ) : (
-                <div className="w-full flex gap-4 animate-in zoom-in-95">
-                  <div className="flex-1 bg-slate-900/90 text-white rounded-[2rem] flex flex-col items-center justify-center p-4 relative overflow-hidden backdrop-blur-md">
-                    <div
-                      className="absolute left-0 top-0 bottom-0 bg-indigo-500/30 transition-all duration-1000 ease-linear"
-                      style={{ width: `${(timeLeft / REST_TIME_SECONDS) * 100}%` }}
+              {/* Weight & Reps */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">訓練重量 ({unit})</label>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setCurrentWeight(w => Math.max(0, w - 1))} className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
+                    <input
+                      type="number" inputMode="decimal"
+                      value={currentWeight}
+                      onChange={(e) => setCurrentWeight(parseFloat(e.target.value) || 0)}
+                      className="flex-1 min-w-0 bg-white/50 py-3 rounded-2xl text-2xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 border border-white/40 text-center shadow-inner"
                     />
-                    <span className="text-[9px] font-black text-slate-400 uppercase z-10">組間休息中...</span>
-                    <span className="text-3xl font-black z-10">{timeLeft}s</span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <button onClick={skipRest} className="px-8 py-3 bg-white/50 text-slate-700 rounded-2xl font-black text-xs hover:bg-white/80 transition-colors border border-white/40">跳過</button>
-                    <button onClick={addExtraRest} className="px-8 py-3 bg-indigo-500/20 text-indigo-700 rounded-2xl font-black text-xs hover:bg-indigo-500/30 transition-colors border border-white/40">+30s</button>
+                    <button onClick={() => setCurrentWeight(w => w + 1)} className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">+</button>
                   </div>
                 </div>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">次數</label>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setCurrentReps(r => Math.max(1, r - 1))} className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
+                    <input
+                      type="number" inputMode="numeric"
+                      value={currentReps}
+                      onChange={(e) => setCurrentReps(parseInt(e.target.value) || 0)}
+                      className="flex-1 min-w-0 bg-white/50 py-3 rounded-2xl text-2xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 border border-white/40 text-center shadow-inner"
+                    />
+                    <button onClick={() => setCurrentReps(r => r + 1)} className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">+</button>
+                  </div>
+                </div>
+              </div>
 
-            {todaySession && (
-              <div className="pt-4 border-t border-white/30">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 flex justify-between">
-                  <span>當前進度</span>
-                  <span className="text-indigo-600 font-black">已完成 {todaySession.sets.length} 組</span>
-                </p>
-                <div className="grid grid-cols-2 gap-3 max-h-32 overflow-y-auto no-scrollbar">
-                  {todaySession.sets.map((set, idx) => (
-                    <div key={idx} className="flex justify-between items-center bg-white/40 backdrop-blur-sm px-5 py-3 rounded-2xl text-[11px] font-black border border-white/50 shadow-sm">
-                      <span className="text-slate-400"># {idx + 1}</span>
-                      <span className="text-slate-800">{unit === 'LBS' ? kgToLbs(set.weight) : set.weight} {unit} × {set.reps}</span>
-                    </div>
+              {/* RPE */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">自覺疲勞度 (RPE)</label>
+                  {currentRpe && (
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${currentRpe >= 9 ? 'bg-red-100 text-red-600' : currentRpe >= 7 ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'
+                      }`}>{RPE_LABELS[currentRpe]}</span>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => (
+                    <button key={v}
+                      onClick={() => setCurrentRpe(currentRpe === v ? null : v)}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${currentRpe === v
+                        ? v >= 9 ? 'bg-red-500 text-white shadow-lg' : v >= 7 ? 'bg-amber-500 text-white shadow-lg' : 'bg-indigo-500 text-white shadow-lg'
+                        : 'bg-white/40 text-slate-400 border border-white/30'
+                        }`}
+                    >{v}</button>
                   ))}
                 </div>
               </div>
-            )}
+
+              {/* AI Coach */}
+              <button
+                onClick={askGeminiCoach}
+                disabled={isCoachLoading}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-xs font-black bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-200/50 text-purple-700 active:scale-95 disabled:opacity-50"
+              >
+                {isCoachLoading ? (<>⏳ 教練思考中...</>) : (<>🤖 問問 AI 教練</>)}
+              </button>
+              {coachMessage && (
+                <div className="bg-purple-50/80 border border-purple-200/50 rounded-2xl p-3">
+                  <p className="text-[11px] font-bold text-purple-800 leading-relaxed whitespace-pre-line">{coachMessage}</p>
+                </div>
+              )}
+
+              {/* Save / Timer */}
+              {!restEndTime ? (
+                <button onClick={handleAddSet}
+                  className="w-full bg-indigo-600/90 text-white py-5 rounded-2xl font-black text-lg shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)] active:scale-95 transition-all"
+                >儲存本組進度</button>
+              ) : (
+                <div className="flex gap-3">
+                  <div className="flex-1 bg-slate-900/90 text-white rounded-2xl flex flex-col items-center justify-center p-3 relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 bg-indigo-500/30 transition-all duration-1000 ease-linear" style={{ width: `${(timeLeft / REST_TIME_SECONDS) * 100}%` }} />
+                    <span className="text-[9px] font-black text-slate-400 uppercase z-10">組間休息中...</span>
+                    <span className="text-2xl font-black z-10">{timeLeft}s</span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button onClick={skipRest} className="px-6 py-2.5 bg-white/50 text-slate-700 rounded-xl font-black text-xs border border-white/40">跳過</button>
+                    <button onClick={addExtraRest} className="px-6 py-2.5 bg-indigo-500/20 text-indigo-700 rounded-xl font-black text-xs border border-white/40">+30s</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Today's Progress */}
+              {todaySession && (
+                <div className="border-t border-white/30 pt-3">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex justify-between">
+                    <span>當前進度</span>
+                    <span className="text-indigo-600">已完成 {todaySession.sets.length} 組</span>
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {todaySession.sets.map((set, idx) => (
+                      <div key={idx} className="bg-white/40 px-2 py-1.5 rounded-xl text-[10px] font-black border border-white/50 text-center">
+                        <span className="text-slate-400">#{idx + 1} </span>
+                        <span className="text-slate-700">{unit === 'LBS' ? kgToLbs(set.weight) : set.weight}×{set.reps}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>{/* end scrollable body */}
           </div>
         </div>
       )}
