@@ -64,6 +64,9 @@ const WeightTraining: React.FC<Props> = ({
   const [showRpePopup, setShowRpePopup] = useState(false);
   const [pendingCloseExercise, setPendingCloseExercise] = useState<Exercise | null>(null);
 
+  // Track if user actually added sets *during this view session*
+  const [newSetsAddedInSession, setNewSetsAddedInSession] = useState(false);
+
   // Smart Coach: base weight setup
   const [showBaseWeightSetup, setShowBaseWeightSetup] = useState(false);
   const [setupWeight, setSetupWeight] = useState<number>(40);
@@ -154,6 +157,9 @@ const WeightTraining: React.FC<Props> = ({
   }, [recommendation, todaySession]);
 
   const handleExerciseClick = (ex: Exercise) => {
+    // Reset the "added sets" tracker when opening an exercise
+    setNewSetsAddedInSession(false);
+
     if (periodizationEnabled && !ex.baseWeight) {
       setActiveExercise(ex);
       setSetupWeight(40);
@@ -166,9 +172,7 @@ const WeightTraining: React.FC<Props> = ({
 
   // Close exercise: check if we should show RPE popup
   const handleCloseExercise = () => {
-    const today = getTodayDateString();
-    const hasTodaySets = sessions.some(s => s.exerciseId === activeExercise?.id && s.date === today && s.sets.length > 0);
-    if (hasTodaySets && activeExercise) {
+    if (newSetsAddedInSession && activeExercise) {
       setPendingCloseExercise(activeExercise);
       setShowRpePopup(true);
     }
@@ -337,6 +341,8 @@ ${historyText || '無歷史紀錄'}
         return [...prev, { id: Math.random().toString(36).substr(2, 9), date, exerciseId: activeExercise.id, sets: [newSet] }];
       }
     });
+
+    setNewSetsAddedInSession(true);
 
     setExercises(prev => prev.map(ex =>
       ex.id === activeExercise.id ? { ...ex, usageCount: ex.usageCount + 1 } : ex
