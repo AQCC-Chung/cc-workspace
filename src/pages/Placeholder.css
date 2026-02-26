@@ -1,0 +1,43 @@
+.placeholder-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 104px 2rem 3rem;
+    text-align: center;
+    gap: 1rem;
+}
+
+.placeholder-icon {
+    font-size: 4rem;
+    margin-bottom: 0.5rem;
+}
+
+.placeholder-page h2 {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.placeholder-page p {
+    color: var(--text-secondary);
+    max-width: 400px;
+    line-height: 1.6;
+}
+
+.placeholder-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 1rem;
+    border-radius: 99px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: rgba(138, 138, 154, 0.15);
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+}
