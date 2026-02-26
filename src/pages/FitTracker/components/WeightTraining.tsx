@@ -31,6 +31,12 @@ const MOTIVATION_QUOTES = [
   "很有活力喔！每一組都是新的開始，保持專注，你是最棒的！"
 ];
 
+const RPE_LABELS: Record<number, string> = {
+  1: '極輕', 2: '很輕', 3: '輕鬆', 4: '適中',
+  5: '稍累', 6: '有感', 7: '偏重', 8: '很重',
+  9: '極重', 10: '極限',
+};
+
 const WeightTraining: React.FC<Props> = ({
   unit, setUnit, exercises, setExercises, sessions, setSessions, onSetComplete
 }) => {
@@ -51,6 +57,21 @@ const WeightTraining: React.FC<Props> = ({
   const [showBaseWeightSetup, setShowBaseWeightSetup] = useState(false);
   const [setupWeight, setSetupWeight] = useState<number>(40);
   const [setupEquipType, setSetupEquipType] = useState<EquipmentType>('machine');
+
+  // Periodization toggle
+  const [periodizationEnabled, setPeriodizationEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('fittracker_periodization');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [showPeriodizationInfo, setShowPeriodizationInfo] = useState(false);
+
+  // Gemini coach
+  const [coachMessage, setCoachMessage] = useState<string | null>(null);
+  const [isCoachLoading, setIsCoachLoading] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('fittracker_periodization', JSON.stringify(periodizationEnabled));
+  }, [periodizationEnabled]);
 
   useEffect(() => {
     if (!restEndTime) return;
@@ -109,9 +130,9 @@ const WeightTraining: React.FC<Props> = ({
 
   // Smart Coach recommendation
   const recommendation = useMemo<CycleRecommendation | null>(() => {
-    if (!activeExercise) return null;
+    if (!activeExercise || !periodizationEnabled) return null;
     return getRecommendation(activeExercise, sessions);
-  }, [activeExercise, sessions]);
+  }, [activeExercise, sessions, periodizationEnabled]);
 
   // Auto-fill target weight/reps when recommendation changes
   useEffect(() => {
@@ -122,7 +143,7 @@ const WeightTraining: React.FC<Props> = ({
   }, [recommendation, todaySession]);
 
   const handleExerciseClick = (ex: Exercise) => {
-    if (!ex.baseWeight) {
+    if (periodizationEnabled && !ex.baseWeight) {
       setActiveExercise(ex);
       setSetupWeight(40);
       setSetupEquipType(ex.equipmentType || 'machine');
@@ -141,6 +162,56 @@ const WeightTraining: React.FC<Props> = ({
     ));
     setActiveExercise({ ...activeExercise, baseWeight: setupWeight, equipmentType: setupEquipType, cycleStartDate: getTodayDateString() });
     setShowBaseWeightSetup(false);
+  };
+
+  const askGeminiCoach = async () => {
+    if (!activeExercise) return;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) { setCoachMessage('尚未設定 Gemini API Key'); return; }
+
+    setIsCoachLoading(true);
+    setCoachMessage(null);
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const history = sessions
+        .filter(s => s.exerciseId === activeExercise.id)
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 5);
+
+      const historyText = history.map(s =>
+        `${s.date}: ${s.sets.map(set => `${set.weight}kg×${set.reps}${set.rpe ? ` RPE${set.rpe}` : ''}`).join(', ')}`
+      ).join('\n');
+
+      const recText = recommendation
+        ? `目前週期：C${recommendation.cycleNumber}-${recommendation.weekType}（${recommendation.weekLabel}），目標：${getProgressSummary(recommendation)}`
+        : '未啟用週期訓練';
+
+      const prompt = `你是一位專業重量訓練教練，用繁體中文回答。語氣簡短有力，像教練在場邊指導。
+
+動作：${activeExercise.name}（${activeExercise.equipmentType || '未分類'}）
+${recText}
+
+近 5 次紀錄：
+${historyText || '無歷史紀錄'}
+
+請給出：
+1. 一句激勵或提醒（根據 RPE 趨勢判斷狀態）
+2. 今天的訓練建議（重量/組數調整）
+3. 一個該動作的技術要點
+
+回覆控制在 80 字以內。`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt,
+      });
+      setCoachMessage(response.text || '教練暫時無法回應');
+    } catch (e) {
+      console.error(e);
+      setCoachMessage('AI 教練暫時無法連線');
+    } finally {
+      setIsCoachLoading(false);
+    }
   };
 
   const playMotivationVoice = async () => {
@@ -263,14 +334,82 @@ const WeightTraining: React.FC<Props> = ({
         )}
       </div>
 
+      {/* Periodization Toggle */}
+      <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">🧠</span>
+          <span className="text-xs font-black text-slate-700">Smart Coach 波動式週期</span>
+          <button
+            onClick={() => setShowPeriodizationInfo(true)}
+            className="w-5 h-5 bg-slate-100 rounded-full text-[10px] font-black text-slate-400 flex items-center justify-center"
+          >?</button>
+        </div>
+        <button
+          onClick={() => setPeriodizationEnabled(!periodizationEnabled)}
+          className={`w-12 h-7 rounded-full transition-all relative ${periodizationEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
+        >
+          <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-1 transition-all ${periodizationEnabled ? 'left-6' : 'left-1'}`} />
+        </button>
+      </div>
+
+      {/* Periodization Info Modal */}
+      {showPeriodizationInfo && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in"
+          onClick={() => setShowPeriodizationInfo(false)}
+        >
+          <div
+            className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 space-y-5 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="text-center">
+              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🧠</div>
+              <h2 className="text-xl font-black text-slate-800">波動式週期訓練</h2>
+            </div>
+
+            <div className="space-y-3 text-[12px] font-bold text-slate-600 leading-relaxed">
+              <p>透過 <strong>每週變換訓練重量和次數</strong>，刺激不同肌纖維類型，避免身體適應停滯。</p>
+
+              <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-full">W1</span>
+                  <span><strong>神經適應</strong>：基準重量 × 4-6 下</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">W2</span>
+                  <span><strong>肌肥大</strong>：80% 重量 × 10-12 下</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full">W3</span>
+                  <span><strong>耐力週</strong>：75% 重量 × 15 下</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full">W4</span>
+                  <span><strong>減量週</strong>：50% 重量 × 10 下</span>
+                </div>
+              </div>
+
+              <p>W1 如果能做到 <strong>8 下以上</strong>，下個循環會自動增加重量（槓鈴 +5kg、啞鈴/器械 +2.5kg）。</p>
+            </div>
+
+            <button
+              onClick={() => setShowPeriodizationInfo(false)}
+              className="w-full py-4 rounded-2xl font-black text-white bg-indigo-600 shadow-lg"
+            >
+              了解！
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar snap-x">
         {CATEGORIES.map(cat => (
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
             className={`flex-none px-6 py-3 rounded-2xl text-xs font-black border transition-all snap-start ${selectedCategory === cat
-                ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100'
-                : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200'
+              ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100'
+              : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200'
               }`}
           >
             {CATEGORIES_CN[cat]}
@@ -406,45 +545,81 @@ const WeightTraining: React.FC<Props> = ({
                 </div>
               )}
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">訓練重量 ({unit})</label>
-                <input
-                  type="number"
-                  value={currentWeight}
-                  onChange={(e) => setCurrentWeight(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-white/50 backdrop-blur-md p-6 rounded-[2rem] text-4xl font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 border border-white/40 text-center transition-all shadow-inner"
-                />
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setCurrentWeight(w => Math.max(0, w - (unit === 'KG' ? 2.5 : 5)))} className="w-12 h-12 bg-white/60 backdrop-blur-md rounded-2xl text-xl font-black text-slate-600 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={currentWeight}
+                    onChange={(e) => setCurrentWeight(parseFloat(e.target.value) || 0)}
+                    className="flex-1 bg-white/50 backdrop-blur-md p-5 rounded-[2rem] text-3xl font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 border border-white/40 text-center transition-all shadow-inner"
+                  />
+                  <button onClick={() => setCurrentWeight(w => w + (unit === 'KG' ? 2.5 : 5))} className="w-12 h-12 bg-white/60 backdrop-blur-md rounded-2xl text-xl font-black text-slate-600 border border-white/40 active:scale-90 transition-all flex items-center justify-center">+</button>
+                </div>
               </div>
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">次數 (Reps)</label>
-                <input
-                  type="number"
-                  value={currentReps}
-                  onChange={(e) => setCurrentReps(parseInt(e.target.value) || 0)}
-                  className="w-full bg-white/50 backdrop-blur-md p-6 rounded-[2rem] text-4xl font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 border border-white/40 text-center transition-all shadow-inner"
-                />
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">次數</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setCurrentReps(r => Math.max(1, r - 1))} className="w-12 h-12 bg-white/60 backdrop-blur-md rounded-2xl text-xl font-black text-slate-600 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={currentReps}
+                    onChange={(e) => setCurrentReps(parseInt(e.target.value) || 0)}
+                    className="flex-1 bg-white/50 backdrop-blur-md p-5 rounded-[2rem] text-3xl font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 border border-white/40 text-center transition-all shadow-inner"
+                  />
+                  <button onClick={() => setCurrentReps(r => r + 1)} className="w-12 h-12 bg-white/60 backdrop-blur-md rounded-2xl text-xl font-black text-slate-600 border border-white/40 active:scale-90 transition-all flex items-center justify-center">+</button>
+                </div>
               </div>
             </div>
 
-            {/* RPE Input */}
-            <div className="pt-2">
-              <div className="flex items-center gap-3">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">RPE</label>
-                <div className="flex-1 flex gap-1">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => (
-                    <button
-                      key={v}
-                      onClick={() => setCurrentRpe(currentRpe === v ? null : v)}
-                      className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${currentRpe === v
-                          ? v >= 9 ? 'bg-red-500 text-white shadow-lg' : v >= 7 ? 'bg-amber-500 text-white shadow-lg' : 'bg-indigo-500 text-white shadow-lg'
-                          : 'bg-white/40 text-slate-400 border border-white/30'
-                        }`}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
+            {/* RPE 自覺疲勞度 */}
+            <div className="pt-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">自覺疲勞度 (RPE)</label>
+                {currentRpe && (
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${currentRpe >= 9 ? 'bg-red-100 text-red-600' : currentRpe >= 7 ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'
+                    }`}>
+                    {RPE_LABELS[currentRpe]}
+                  </span>
+                )}
               </div>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setCurrentRpe(currentRpe === v ? null : v)}
+                    className={`flex-1 py-2.5 rounded-xl text-[10px] font-black transition-all flex flex-col items-center gap-0.5 ${currentRpe === v
+                      ? v >= 9 ? 'bg-red-500 text-white shadow-lg' : v >= 7 ? 'bg-amber-500 text-white shadow-lg' : 'bg-indigo-500 text-white shadow-lg'
+                      : 'bg-white/40 text-slate-400 border border-white/30'
+                      }`}
+                  >
+                    <span>{v}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Gemini Coach Interactive */}
+            <div className="pt-1">
+              <button
+                onClick={askGeminiCoach}
+                disabled={isCoachLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-black transition-all bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-200/50 text-purple-700 hover:from-purple-500/20 hover:to-indigo-500/20 active:scale-95 disabled:opacity-50"
+              >
+                {isCoachLoading ? (
+                  <><span className="animate-spin">⏳</span> 教練思考中...</>
+                ) : (
+                  <><span>🤖</span> 問問 AI 教練</>
+                )}
+              </button>
+              {coachMessage && (
+                <div className="mt-2 bg-purple-50/80 backdrop-blur-sm border border-purple-200/50 rounded-2xl p-4">
+                  <p className="text-[11px] font-bold text-purple-800 leading-relaxed whitespace-pre-line">{coachMessage}</p>
+                </div>
+              )}
             </div>
 
             <div className="pt-2">
@@ -534,8 +709,8 @@ const WeightTraining: React.FC<Props> = ({
                       key={type}
                       onClick={() => setSetupEquipType(type)}
                       className={`py-3 rounded-2xl text-xs font-black transition-all ${setupEquipType === type
-                          ? 'bg-indigo-600 text-white shadow-lg'
-                          : 'bg-slate-50 text-slate-500 border border-slate-200'
+                        ? 'bg-indigo-600 text-white shadow-lg'
+                        : 'bg-slate-50 text-slate-500 border border-slate-200'
                         }`}
                     >
                       {type === 'barbell' ? '槓鈴' : type === 'dumbbell' ? '啞鈴' : '器械'}
