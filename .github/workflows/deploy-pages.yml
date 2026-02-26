@@ -37,8 +37,8 @@ jobs:
           VITE_EMAILJS_SERVICE_ID: ${{ vars.VITE_EMAILJS_SERVICE_ID }}
           VITE_EMAILJS_TEMPLATE_ID: ${{ vars.VITE_EMAILJS_TEMPLATE_ID }}
           VITE_EMAILJS_PUBLIC_KEY: ${{ vars.VITE_EMAILJS_PUBLIC_KEY }}
-          VITE_GEMINI_API_KEY: ${{ vars.VITE_GEMINI_API_KEY }}
-
+          VITE_GEMINI_API_KEY_FREE: ${{ vars.VITE_GEMINI_API_KEY_FREE }}
+          VITE_GEMINI_API_KEY_PAID: ${{ vars.VITE_GEMINI_API_KEY_PAID }}
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
