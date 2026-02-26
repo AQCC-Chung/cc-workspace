@@ -70,15 +70,22 @@ export async function emailBackup(
     const dateStr = new Date().toISOString().split('T')[0];
     const jsonString = JSON.stringify(backup, null, 2);
 
+    // Encode JSON to base64 Data URI for EmailJS attachment
+    const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
+    const dataUri = `data:application/json;base64,${base64Data}`;
+
     await emailjs.send(
         EMAILJS_SERVICE_ID,
         EMAILJS_TEMPLATE_ID,
         {
             to_email: email,
             date: dateStr,
-            backup_data: jsonString,
+            backup_data: '如附件 (fittracker-backup.json)',
             total_sessions: backup.weightSessions.length,
             total_cardio: backup.cardioRecords.length,
+            // EmailJS attachment parameter
+            content: dataUri,
+            filename: `fittracker-backup-${dateStr}.json`
         },
         EMAILJS_PUBLIC_KEY
     );

@@ -125,9 +125,9 @@ const FitTracker: React.FC = () => {
   const hasEmailConfig = !!(import.meta.env.VITE_EMAILJS_SERVICE_ID);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col pb-10 pt-16">
-      <header className="sticky top-0 z-50 bg-[#0f172a] text-white shadow-2xl border-b border-slate-800">
-        <div className="px-5 pt-5 pb-3 flex justify-between items-center">
+    <div className="min-h-screen bg-slate-50 flex flex-col pb-10 pt-16 relative">
+      <header className="fixed top-16 left-0 right-0 z-40 bg-[#0f172a] text-white shadow-2xl border-b border-slate-800 transition-transform">
+        <div className="px-5 pt-5 pb-3 flex justify-between items-center max-w-xl mx-auto">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowSettings(true)}
@@ -188,7 +188,7 @@ const FitTracker: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto w-full p-4 space-y-6">
+      <main className="max-w-xl mx-auto w-full p-4 space-y-6 mt-[140px]">
         <nav className="flex p-1.5 bg-slate-200/50 rounded-2xl shadow-inner border border-slate-200/50 backdrop-blur-sm">
           {(['WEIGHT', 'CARDIO', 'CALENDAR'] as ViewType[]).map((tab) => (
             <button
