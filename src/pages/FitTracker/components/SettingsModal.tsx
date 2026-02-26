@@ -13,6 +13,11 @@ interface Props {
   hasEmailConfig: boolean;
   ttsEnabled: boolean;
   setTtsEnabled: (v: boolean) => void;
+  periodizationEnabled: boolean;
+  setPeriodizationEnabled: (v: boolean) => void;
+  setShowPeriodizationInfo: (v: boolean) => void;
+  bodyData: { weight: number; height: number; age: number };
+  setBodyData: (data: { weight: number; height: number; age: number }) => void;
 }
 
 const SettingsModal: React.FC<Props> = ({
@@ -26,6 +31,11 @@ const SettingsModal: React.FC<Props> = ({
   hasEmailConfig,
   ttsEnabled,
   setTtsEnabled,
+  periodizationEnabled,
+  setPeriodizationEnabled,
+  setShowPeriodizationInfo,
+  bodyData,
+  setBodyData,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [quotaStatus, setQuotaStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
@@ -109,6 +119,67 @@ const SettingsModal: React.FC<Props> = ({
           {quotaStatus === 'error' && (
             <p className="text-[10px] font-black text-red-500 ml-1">❌ {quotaMsg}</p>
           )}
+
+          {/* Periodization Toggle */}
+          <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl mt-4">
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🧠</span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-black text-slate-700">Smart Coach 週期</p>
+                  <button
+                    onClick={() => {
+                      onClose(); // Optional: close settings when opening info
+                      setShowPeriodizationInfo(true);
+                    }}
+                    className="w-4 h-4 bg-slate-200 rounded-full text-[8px] font-black text-slate-500 flex items-center justify-center"
+                  >?</button>
+                </div>
+                <p className="text-[10px] text-slate-400">自動變換訓練重量和次數</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setPeriodizationEnabled(!periodizationEnabled)}
+              className={`w-12 h-7 rounded-full transition-all relative ${periodizationEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
+            >
+              <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-1 transition-all ${periodizationEnabled ? 'left-6' : 'left-1'}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body Data Section */}
+        <div className="space-y-3 pt-2">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">體態數據</p>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">體重 (kg)</label>
+              <input
+                type="number"
+                value={bodyData.weight || ''}
+                onChange={(e) => setBodyData({ ...bodyData, weight: Number(e.target.value) })}
+                className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-black text-slate-700 focus:outline-none focus:border-indigo-500 transition-all text-center"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">身高 (cm)</label>
+              <input
+                type="number"
+                value={bodyData.height || ''}
+                onChange={(e) => setBodyData({ ...bodyData, height: Number(e.target.value) })}
+                className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-black text-slate-700 focus:outline-none focus:border-indigo-500 transition-all text-center"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">年齡 (y)</label>
+              <input
+                type="number"
+                value={bodyData.age || ''}
+                onChange={(e) => setBodyData({ ...bodyData, age: Number(e.target.value) })}
+                className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-black text-slate-700 focus:outline-none focus:border-indigo-500 transition-all text-center"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Data Section */}

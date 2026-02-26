@@ -30,6 +30,9 @@ import SettingsModal from './components/SettingsModal';
 
 const FitTracker: React.FC = () => {
   // Persistence states
+  // We check if "bodyData" exists in local storage to determine if the user is completely new.
+  const isFirstTime = !localStorage.getItem('bodyData');
+
   const [bodyData, setBodyData] = useState<UserBodyData>(() => {
     const saved = localStorage.getItem('bodyData');
     return saved ? JSON.parse(saved) : { weight: 70, height: 175, age: 25 };
@@ -57,7 +60,7 @@ const FitTracker: React.FC = () => {
   const [unit, setUnit] = useState<Unit>('KG');
   const [activeTab, setActiveTab] = useState<ViewType>('WEIGHT');
   const [timerEnd, setTimerEnd] = useState<number | null>(null);
-  const [showBodyModal, setShowBodyModal] = useState(false);
+  const [showBodyModal, setShowBodyModal] = useState(isFirstTime);
   const [showSettings, setShowSettings] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
@@ -65,18 +68,41 @@ const FitTracker: React.FC = () => {
     return saved !== null ? JSON.parse(saved) : false;
   });
 
+  // Periodization toggle (migrated from WeightTraining)
+  const [periodizationEnabled, setPeriodizationEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('fittracker_periodization');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [showPeriodizationInfo, setShowPeriodizationInfo] = useState(false);
+
+  // Persist settings
+  useEffect(() => {
+    localStorage.setItem('bodyData', JSON.stringify(bodyData));
+  }, [bodyData]);
+
+  useEffect(() => {
+    localStorage.setItem('exercises', JSON.stringify(exercises));
+  }, [exercises]);
+
+  useEffect(() => {
+    localStorage.setItem('weightSessions', JSON.stringify(weightSessions));
+  }, [weightSessions]);
+
+  useEffect(() => {
+    localStorage.setItem('cardioRecords', JSON.stringify(cardioRecords));
+  }, [cardioRecords]);
+
   useEffect(() => {
     localStorage.setItem('fittracker_tts', JSON.stringify(ttsEnabled));
   }, [ttsEnabled]);
 
-  // Sync with localStorage
   useEffect(() => {
-    localStorage.setItem('bodyData', JSON.stringify(bodyData));
-    localStorage.setItem('exercises', JSON.stringify(exercises));
-    localStorage.setItem('weightSessions', JSON.stringify(weightSessions));
-    localStorage.setItem('cardioRecords', JSON.stringify(cardioRecords));
+    localStorage.setItem('fittracker_periodization', JSON.stringify(periodizationEnabled));
+  }, [periodizationEnabled]);
+
+  useEffect(() => {
     localStorage.setItem('fittracker_email', userEmail);
-  }, [bodyData, exercises, weightSessions, cardioRecords, userEmail]);
+  }, [userEmail]);
 
   const todayStr = getTodayDateString();
   const stats = useMemo(() =>
@@ -160,35 +186,9 @@ const FitTracker: React.FC = () => {
             </div>
           </div>
         </div>
+      </header >
 
-        <div className="px-5 pb-5">
-          <button
-            onClick={() => setShowBodyModal(true)}
-            className="w-full bg-slate-800/40 hover:bg-slate-800/80 transition-all border border-slate-700/50 rounded-2xl p-4 flex justify-between items-center group backdrop-blur-md"
-          >
-            <div className="flex items-center gap-5">
-              <div className="flex flex-col items-start">
-                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Weight</span>
-                <span className="text-sm font-black text-slate-200">{bodyData.weight}<small className="text-[10px] ml-0.5 opacity-60">kg</small></span>
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Height</span>
-                <span className="text-sm font-black text-slate-200">{bodyData.height}<small className="text-[10px] ml-0.5 opacity-60">cm</small></span>
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Age</span>
-                <span className="text-sm font-black text-slate-200">{bodyData.age}<small className="text-[10px] ml-0.5 opacity-60">y</small></span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20">
-              <span className="text-[10px] font-black text-indigo-400">數據更新</span>
-              <span className="text-indigo-400 group-hover:translate-x-1 transition-transform">→</span>
-            </div>
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-xl mx-auto w-full p-4 space-y-6 mt-[140px]">
+      <main className="max-w-xl mx-auto w-full p-4 space-y-6 mt-[88px]">
         <nav className="flex p-1.5 bg-slate-200/50 rounded-2xl shadow-inner border border-slate-200/50 backdrop-blur-sm">
           {(['WEIGHT', 'CARDIO', 'CALENDAR'] as ViewType[]).map((tab) => (
             <button
@@ -215,6 +215,7 @@ const FitTracker: React.FC = () => {
               setSessions={setWeightSessions}
               onSetComplete={startRestTimer}
               ttsEnabled={ttsEnabled}
+              periodizationEnabled={periodizationEnabled}
             />
           )}
           {activeTab === 'CARDIO' && (
@@ -234,36 +235,93 @@ const FitTracker: React.FC = () => {
         </div>
       </main>
 
-      {showBodyModal && (
-        <BodyDataSection
-          data={bodyData}
-          onUpdate={(newData) => setBodyData(newData)}
-          onClose={() => setShowBodyModal(false)}
-        />
-      )}
+      {
+        showBodyModal && (
+          <BodyDataSection
+            data={bodyData}
+            onUpdate={(newData) => setBodyData(newData)}
+            onClose={() => setShowBodyModal(false)}
+          />
+        )
+      }
 
-      {showSettings && (
-        <SettingsModal
-          userEmail={userEmail}
-          setUserEmail={setUserEmail}
-          onClose={() => setShowSettings(false)}
-          onDownload={handleDownload}
-          onEmailBackup={handleEmailBackup}
-          onImport={handleImport}
-          isSyncing={isSyncing}
-          hasEmailConfig={hasEmailConfig}
-          ttsEnabled={ttsEnabled}
-          setTtsEnabled={setTtsEnabled}
-        />
-      )}
+      {
+        showSettings && (
+          <SettingsModal
+            userEmail={userEmail}
+            setUserEmail={setUserEmail}
+            onClose={() => setShowSettings(false)}
+            onDownload={handleDownload}
+            onEmailBackup={handleEmailBackup}
+            onImport={handleImport}
+            isSyncing={isSyncing}
+            hasEmailConfig={hasEmailConfig}
+            ttsEnabled={ttsEnabled}
+            setTtsEnabled={setTtsEnabled}
+            periodizationEnabled={periodizationEnabled}
+            setPeriodizationEnabled={setPeriodizationEnabled}
+            setShowPeriodizationInfo={setShowPeriodizationInfo}
+            bodyData={bodyData}
+            setBodyData={setBodyData}
+          />
+        )
+      }
 
-      {timerEnd && (
-        <Timer
-          endTime={timerEnd}
-          onClose={() => setTimerEnd(null)}
-        />
+      {
+        timerEnd && (
+          <Timer
+            endTime={timerEnd}
+            onClose={() => setTimerEnd(null)}
+          />
+        )
+      }
+
+      {/* Periodization Info Modal */}
+      {showPeriodizationInfo && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in"
+          onClick={() => setShowPeriodizationInfo(false)}
+        >
+          <div
+            className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 space-y-5 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="text-center">
+              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🧠</div>
+              <h2 className="text-xl font-black text-slate-800">波動式週期訓練</h2>
+            </div>
+
+            <div className="space-y-3 text-[12px] font-bold text-slate-600 leading-relaxed">
+              <p>透過 <strong>每週變換訓練重量和次數</strong>，刺激不同肌纖維類型，避免身體適應停滯。</p>
+
+              <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">W1</span>
+                  <span><strong>肌肥大</strong>：75% 基準重量 × 8-12 下 × 4 組</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-full">W2</span>
+                  <span><strong>力量週</strong>：基準重量 × 4-6 下 × 4 組</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full">W3</span>
+                  <span><strong>減量週</strong>：50% 基準重量 × 8-10 下 × 2 組</span>
+                </div>
+              </div>
+
+              <p>W2 力量週做到 <strong>6 下以上</strong>，下個循環會自動增加重量（槓鈴 +5kg、啞鈴/器械 +2.5kg）。</p>
+            </div>
+
+            <button
+              onClick={() => setShowPeriodizationInfo(false)}
+              className="w-full py-4 rounded-2xl font-black text-white bg-indigo-600 shadow-lg"
+            >
+              了解！
+            </button>
+          </div>
+        </div>
       )}
-    </div>
+    </div >
   );
 };
 
