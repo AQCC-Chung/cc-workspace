@@ -50,7 +50,7 @@ const SettingsModal: React.FC<Props> = ({
     try {
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: '回覆「OK」兩個字即可',
       });
       if (response.text) {

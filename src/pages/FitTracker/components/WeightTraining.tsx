@@ -241,7 +241,7 @@ ${historyText || '無歷史紀錄'}
 回覆控制在 80 字以內。`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
       });
       setCoachMessage(response.text || '教練暫時無法回應');
