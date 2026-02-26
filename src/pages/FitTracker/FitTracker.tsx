@@ -9,6 +9,7 @@ import {
   Unit,
   WorkoutCategory
 } from './types';
+import { createBackup, downloadBackup, emailBackup, parseBackupFile } from './dataIO';
 import {
   INITIAL_EXERCISES,
   REST_TIME_SECONDS,
@@ -27,7 +28,7 @@ import CalendarView from './components/CalendarView';
 import Timer from './components/Timer';
 import SettingsModal from './components/SettingsModal';
 
-const App: React.FC = () => {
+const FitTracker: React.FC = () => {
   // Persistence states
   const [bodyData, setBodyData] = useState<UserBodyData>(() => {
     const saved = localStorage.getItem('bodyData');
@@ -49,8 +50,8 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [gasUrl, setGasUrl] = useState<string>(() =>
-    localStorage.getItem('gasUrl') || 'https://script.google.com/macros/s/AKfycbyKrAXjUKAoZVCvPmU7ZrfZN6rU7e4KL1evBb1oSKr3k-xyGovOqT1mmlE1gZZfY5S6TA/exec'
+  const [userEmail, setUserEmail] = useState<string>(() =>
+    localStorage.getItem('fittracker_email') || ''
   );
 
   const [unit, setUnit] = useState<Unit>('KG');
@@ -66,8 +67,8 @@ const App: React.FC = () => {
     localStorage.setItem('exercises', JSON.stringify(exercises));
     localStorage.setItem('weightSessions', JSON.stringify(weightSessions));
     localStorage.setItem('cardioRecords', JSON.stringify(cardioRecords));
-    localStorage.setItem('gasUrl', gasUrl);
-  }, [bodyData, exercises, weightSessions, cardioRecords, gasUrl]);
+    localStorage.setItem('fittracker_email', userEmail);
+  }, [bodyData, exercises, weightSessions, cardioRecords, userEmail]);
 
   const todayStr = getTodayDateString();
   const stats = useMemo(() =>
@@ -79,43 +80,41 @@ const App: React.FC = () => {
     setTimerEnd(Date.now() + REST_TIME_SECONDS * 1000);
   }, []);
 
-  const handleCloudSync = async (mode: 'UPLOAD' | 'DOWNLOAD') => {
-    if (!gasUrl) {
-      setShowSettings(true);
-      return;
-    }
+  const handleDownload = () => {
+    const backup = createBackup(bodyData, exercises, weightSessions, cardioRecords);
+    downloadBackup(backup);
+    alert('備份檔已下載！');
+  };
 
+  const handleEmailBackup = async () => {
+    if (!userEmail) return;
     setIsSyncing(true);
     try {
-      if (mode === 'UPLOAD') {
-        const payload = { bodyData, exercises, weightSessions, cardioRecords };
-        // GAS using POST requires no-cors sometimes for simple fetch, 
-        // but it won't let you see the result. Standard CORS is better if GAS is set up for it.
-        await fetch(gasUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        alert('備份指令已送出！資料將同步至 Google Sheets。');
-      } else {
-        const response = await fetch(gasUrl);
-        const data = await response.json();
-        if (data) {
-          if (data.bodyData) setBodyData(data.bodyData);
-          if (data.exercises) setExercises(data.exercises);
-          if (data.weightSessions) setWeightSessions(data.weightSessions);
-          if (data.cardioRecords) setCardioRecords(data.cardioRecords);
-          alert('同步成功！已從雲端載入最新資料');
-        }
-      }
+      const backup = createBackup(bodyData, exercises, weightSessions, cardioRecords);
+      await emailBackup(userEmail, backup);
+      alert(`備份已寄送至 ${userEmail}！`);
     } catch (e) {
       console.error(e);
-      alert('同步失敗，請確認 GAS 腳本部署權限或網址是否正確。');
+      alert(`寄送失敗：${(e as Error).message}`);
     } finally {
       setIsSyncing(false);
     }
   };
+
+  const handleImport = async (file: File) => {
+    try {
+      const backup = await parseBackupFile(file);
+      setBodyData(backup.bodyData);
+      setExercises(backup.exercises);
+      setWeightSessions(backup.weightSessions);
+      setCardioRecords(backup.cardioRecords);
+      alert('資料已成功還原！');
+    } catch (e) {
+      alert(`匯入失敗：${(e as Error).message}`);
+    }
+  };
+
+  const hasEmailConfig = !!(import.meta.env.VITE_EMAILJS_SERVICE_ID);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-10 pt-16">
@@ -135,8 +134,8 @@ const App: React.FC = () => {
               </h1>
               <div className="flex items-center gap-1.5 mt-1">
                 <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{todayStr}</p>
-                {gasUrl && (
-                  <div className={`w-1.5 h-1.5 rounded-full ${isSyncing ? 'bg-amber-400 animate-pulse' : 'bg-green-500'}`}></div>
+                {isSyncing && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></div>
                 )}
               </div>
             </div>
@@ -188,8 +187,8 @@ const App: React.FC = () => {
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`flex-1 py-3.5 text-xs font-black rounded-xl transition-all duration-300 ${activeTab === tab
-                  ? 'bg-white text-indigo-600 shadow-xl shadow-indigo-100 transform scale-[1.02]'
-                  : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white text-indigo-600 shadow-xl shadow-indigo-100 transform scale-[1.02]'
+                : 'text-slate-500 hover:text-slate-800'
                 }`}
             >
               {tab === 'WEIGHT' ? '重量訓練' : tab === 'CARDIO' ? '有氧運動' : '訓練日誌'}
@@ -236,11 +235,14 @@ const App: React.FC = () => {
 
       {showSettings && (
         <SettingsModal
-          url={gasUrl}
-          setUrl={setGasUrl}
+          userEmail={userEmail}
+          setUserEmail={setUserEmail}
           onClose={() => setShowSettings(false)}
-          onSync={handleCloudSync}
+          onDownload={handleDownload}
+          onEmailBackup={handleEmailBackup}
+          onImport={handleImport}
           isSyncing={isSyncing}
+          hasEmailConfig={hasEmailConfig}
         />
       )}
 
@@ -254,4 +256,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+export default FitTracker;
