@@ -10,3 +10,4 @@ backend/*.db
 .gemini/
 .vscode/
 .idea/
+cc-workspace/
