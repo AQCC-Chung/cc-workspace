@@ -20,11 +20,11 @@ const FEATURES = [
     },
     {
         icon: '💪',
-        title: '健身紀錄',
+        title: 'FitTracker',
         desc: '記錄每天的訓練組數、重量與進步軌跡。',
         to: '/gym',
         accent: 'var(--accent-green)',
-        ready: false,
+        ready: true,
     },
     {
         icon: '🎙️',

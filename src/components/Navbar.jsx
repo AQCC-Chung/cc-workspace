@@ -6,7 +6,7 @@ const NAV_ITEMS = [
     { to: '/', icon: '🏠', label: '首頁' },
     { to: '/tastemap', icon: '🗺️', label: 'TasteMap' },
     { to: '/flights', icon: '✈️', label: '機票搜尋' },
-    { to: '/gym', icon: '💪', label: '健身紀錄' },
+    { to: '/gym', icon: '💪', label: 'FitTracker' },
     { to: '/meetnote', icon: '🎙️', label: 'MeetNote' },
 ]
 
