@@ -85,3 +85,8 @@ export const CARDIO_EQUIPMENT = [
 
 export const KG_TO_LBS = 2.20462;
 export const REST_TIME_SECONDS = 90;
+
+// Smart Coach — 進階增量
+export const INCREMENT_BARBELL = 5;
+export const INCREMENT_DUMBBELL = 2.5;
+export const INCREMENT_MACHINE = 2.5;

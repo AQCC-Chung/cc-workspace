@@ -1,6 +1,8 @@
 
 export type Unit = 'KG' | 'LBS';
 
+export type EquipmentType = 'barbell' | 'dumbbell' | 'machine';
+
 export interface UserBodyData {
   weight: number;
   height: number;
@@ -14,12 +16,16 @@ export interface Exercise {
   name: string;
   category: WorkoutCategory;
   usageCount: number;
+  equipmentType?: EquipmentType;
+  baseWeight?: number;
+  cycleStartDate?: string;
 }
 
 export interface SetRecord {
   weight: number; // Stored in KG
   reps: number;
   timestamp: number;
+  rpe?: number; // 主觀疲勞度 1-10
 }
 
 export interface WeightWorkoutSession {
