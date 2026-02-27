@@ -1,0 +1,3 @@
+## 2026-02-27 - [FitTracker] Icon-Only Button Accessibility
+**Learning:** Icon-only buttons (like `+`, `-`, `⚙️`, `✕`) are common in mobile-first designs but create severe barriers for screen reader users if they rely solely on visual symbols. Adding `aria-label` provides necessary context (e.g., "增加重量" instead of just "plus") without altering the visual design.
+**Action:** When creating or spotting icon-only buttons, always ensure an `aria-label` is present. If the button has a dedicated visual label nearby, `aria-labelledby` might be better, but for standalone controls, `aria-label` is mandatory.

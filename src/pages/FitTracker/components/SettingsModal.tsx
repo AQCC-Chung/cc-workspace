@@ -70,7 +70,7 @@ const SettingsModal: React.FC<Props> = ({
       >
         <div className="flex justify-between items-center mb-2 px-2">
           <h2 className="text-2xl font-black text-slate-800 tracking-tight">設定</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-300 hover:text-slate-700 transition-colors">
+          <button onClick={onClose} aria-label="關閉" className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-300 hover:text-slate-700 transition-colors">
             <span className="sr-only">關閉</span>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
@@ -92,6 +92,7 @@ const SettingsModal: React.FC<Props> = ({
             <button
               onClick={() => setTtsEnabled(!ttsEnabled)}
               className={`w-12 h-7 rounded-full transition-all relative ${ttsEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
+              aria-label="切換語音激勵"
             >
               <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-1 transition-all ${ttsEnabled ? 'left-6' : 'left-1'}`} />
             </button>
@@ -132,6 +133,7 @@ const SettingsModal: React.FC<Props> = ({
                       setShowPeriodizationInfo(true);
                     }}
                     className="w-4 h-4 bg-slate-200 rounded-full text-[8px] font-black text-slate-500 flex items-center justify-center hover:bg-slate-300 transition-colors"
+                    aria-label="關於 Smart Coach"
                   >?</button>
                 </div>
                 <p className="text-[10px] text-slate-500">自動變換訓練重量和次數</p>
@@ -140,6 +142,7 @@ const SettingsModal: React.FC<Props> = ({
             <button
               onClick={() => setPeriodizationEnabled(!periodizationEnabled)}
               className={`w-12 h-7 rounded-full transition-all relative ${periodizationEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
+              aria-label="切換 Smart Coach"
             >
               <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-1 transition-all ${periodizationEnabled ? 'left-6' : 'left-1'}`} />
             </button>
