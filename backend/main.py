@@ -1,11 +1,17 @@
 import os
-from fastapi import FastAPI, Query
+import logging
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import sqlite3
 from dotenv import load_dotenv
 import scraper
 
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -24,6 +30,15 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=[],
 )
+
+# Global exception handler to prevent stack trace leakage
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"message": "Internal Server Error"},
+    )
 
 @app.get("/api/recommendations")
 def get_recommendations():
