@@ -11,12 +11,15 @@ export default function Card({ data, onClick }: CardProps) {
     const handleSourceClick = (e: MouseEvent) => {
         e.stopPropagation();
         if (data.article_url) {
-            window.open(data.article_url, '_blank');
+            window.open(data.article_url, '_blank', 'noopener,noreferrer');
         }
     };
 
     return (
-        <div className="card" onClick={() => onClick(data)}>
+        <div className="card" onClick={(e) => {
+            if ((e.target as HTMLElement).closest('.card-influencer')) return;
+            onClick(data);
+        }}>
             <div className="card-image-wrapper">
                 <img src={data.image} alt={data.name} className="card-image" />
                 <div className="card-overlay">

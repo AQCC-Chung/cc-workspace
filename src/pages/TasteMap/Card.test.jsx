@@ -44,6 +44,7 @@ describe('Card Component', () => {
 
         fireEvent.click(screen.getByRole('heading', { name: /Test Restaurant/i }).closest('.card'));
         expect(mockOnClick).toHaveBeenCalledWith(mockData);
+        mockOnClick.mockClear();
     });
 
     it('stops propagation and opens window when influencer link is clicked', () => {
@@ -53,10 +54,11 @@ describe('Card Component', () => {
         const influencerLink = screen.getByText(/Chef John/);
         fireEvent.click(influencerLink);
 
-        expect(windowSpy).toHaveBeenCalledWith('https://example.com/article', '_blank');
+        expect(windowSpy).toHaveBeenCalledWith('https://example.com/article', '_blank', 'noopener,noreferrer');
         expect(mockOnClick).not.toHaveBeenCalled();
 
         windowSpy.mockRestore();
+        mockOnClick.mockClear();
     });
 
     it('stops propagation but does not open window if article_url is missing', () => {
@@ -71,5 +73,6 @@ describe('Card Component', () => {
         expect(mockOnClick).not.toHaveBeenCalled();
 
         windowSpy.mockRestore();
+        mockOnClick.mockClear();
     });
 });
