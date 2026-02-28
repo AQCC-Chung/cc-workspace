@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Card from './Card';
 
 describe('Card Component', () => {
@@ -12,10 +12,13 @@ describe('Card Component', () => {
         price_range: '$$',
         quote: 'Delicious!',
         influencer: 'Chef John',
-        article_url: 'https://example.com/article'
+        article_url: 'https://example.com/article',
     };
 
-    const mockOnClick = vi.fn();
+    let mockOnClick;
+    beforeEach(() => {
+        mockOnClick = vi.fn();
+    });
 
     it('renders card with correct data', () => {
         render(<Card data={mockData} onClick={mockOnClick} />);
@@ -42,7 +45,11 @@ describe('Card Component', () => {
     it('calls onClick when card is clicked', () => {
         render(<Card data={mockData} onClick={mockOnClick} />);
 
-        fireEvent.click(screen.getByRole('heading', { name: /Test Restaurant/i }).closest('.card'));
+        fireEvent.click(
+            screen
+                .getByRole('heading', { name: /Test Restaurant/i })
+                .closest('.card')
+        );
         expect(mockOnClick).toHaveBeenCalledWith(mockData);
     });
 
@@ -53,7 +60,10 @@ describe('Card Component', () => {
         const influencerLink = screen.getByText(/Chef John/);
         fireEvent.click(influencerLink);
 
-        expect(windowSpy).toHaveBeenCalledWith('https://example.com/article', '_blank');
+        expect(windowSpy).toHaveBeenCalledWith(
+            'https://example.com/article',
+            '_blank'
+        );
         expect(mockOnClick).not.toHaveBeenCalled();
 
         windowSpy.mockRestore();
