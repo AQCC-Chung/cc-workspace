@@ -1,13 +1,25 @@
 import os
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
+import logging
 from dotenv import load_dotenv
 import scraper
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI()
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"error": "An internal error occurred. Please try again later."},
+    )
 
 # Allow frontend origins — both local dev and GitHub Pages production
 ALLOWED_ORIGINS = [
@@ -37,7 +49,7 @@ def get_recommendations():
 
 @app.get("/api/search")
 def search_recommendations(
-    q: str = Query(..., description="Search keyword"),
+    q: str = Query(..., max_length=100, description="Search keyword"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(10, ge=1, le=20, description="Results per page"),
 ):

@@ -1,0 +1,4 @@
+## 2024-05-18 - [Add Input Validation and Secure Error Handling]
+**Vulnerability:** The API endpoint `/api/search` lacked an input length limit for the search query, opening the system up to DoS through overly large payloads processed by the backend. Additionally, the backend was missing a global exception handler, potentially leaking stack traces to the user.
+**Learning:** In simple endpoints relying on third-party integrations (like DuckDuckGo search and Google Places APIs), limiting user input strings and catching unhandled exceptions ensures the infrastructure doesn't process infinite data streams and maintains generic error messages securely.
+**Prevention:** In the future, explicitly define `max_length` using FastAPI's `Query` parameter and ensure all backend applications implement a robust `app.exception_handler(Exception)` from the start.
