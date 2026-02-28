@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import './DetailModal.css';
 import { Recommendation } from '../../types';
 
@@ -7,12 +8,31 @@ interface DetailModalProps {
 }
 
 export default function DetailModal({ item, onClose }: DetailModalProps) {
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        if (item) {
+            window.addEventListener('keydown', handleKeyDown);
+            // Prevent scrolling on body when modal is open
+            document.body.style.overflow = 'hidden';
+        }
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            document.body.style.overflow = 'unset';
+        };
+    }, [item, onClose]);
+
     if (!item) return null;
 
     return (
-        <div className="modal-backdrop" onClick={onClose}>
+        <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="modal-title">
             <div className="modal-content" onClick={e => e.stopPropagation()}>
-                <button className="modal-close-btn" onClick={onClose}>×</button>
+                <button className="modal-close-btn" onClick={onClose} aria-label="關閉">×</button>
 
                 <div className="modal-image-container">
                     <img src={item.image} alt={item.name} className="modal-image" />
@@ -23,7 +43,7 @@ export default function DetailModal({ item, onClose }: DetailModalProps) {
                     <div className="modal-header">
                         <div>
                             <span className="modal-category">{item.category}</span>
-                            <h2 className="modal-title">{item.name}</h2>
+                            <h2 id="modal-title" className="modal-title">{item.name}</h2>
                         </div>
                         <div className="modal-rating">★ {item.rating}</div>
                     </div>

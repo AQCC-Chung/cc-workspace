@@ -1,0 +1,3 @@
+## 2024-03-14 - Modal Accessibility and Focus Management
+**Learning:** Custom modal components often lack native accessibility features compared to native `<dialog>` elements. Screen readers and keyboard users rely heavily on `role="dialog"`, `aria-modal="true"`, and Escape key handlers to navigate and understand modal contexts properly. When a modal opens, background scrolling should be prevented to maintain context.
+**Action:** Always ensure custom modal implementations include: 1. `role="dialog"` 2. `aria-modal="true"` 3. `aria-labelledby` pointing to the title 4. Escape key listener to close 5. Body scroll lock while open.
