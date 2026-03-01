@@ -49,6 +49,7 @@ describe('Card Component', () => {
     it('stops propagation and opens window when influencer link is clicked', () => {
         const windowSpy = vi.spyOn(window, 'open').mockImplementation(() => {});
         render(<Card data={mockData} onClick={mockOnClick} />);
+        mockOnClick.mockClear();
 
         const influencerLink = screen.getByText(/Chef John/);
         fireEvent.click(influencerLink);
@@ -63,6 +64,7 @@ describe('Card Component', () => {
         const windowSpy = vi.spyOn(window, 'open').mockImplementation(() => {});
         const dataWithoutUrl = { ...mockData, article_url: '' };
         render(<Card data={dataWithoutUrl} onClick={mockOnClick} />);
+        mockOnClick.mockClear();
 
         const influencerLink = screen.getByText(/Chef John/);
         fireEvent.click(influencerLink);
