@@ -47,19 +47,21 @@ describe('Card Component', () => {
     });
 
     it('stops propagation and opens window when influencer link is clicked', () => {
+        mockOnClick.mockClear();
         const windowSpy = vi.spyOn(window, 'open').mockImplementation(() => {});
         render(<Card data={mockData} onClick={mockOnClick} />);
 
         const influencerLink = screen.getByText(/Chef John/);
         fireEvent.click(influencerLink);
 
-        expect(windowSpy).toHaveBeenCalledWith('https://example.com/article', '_blank');
+        expect(windowSpy).toHaveBeenCalledWith('https://example.com/article', '_blank', 'noopener,noreferrer');
         expect(mockOnClick).not.toHaveBeenCalled();
 
         windowSpy.mockRestore();
     });
 
     it('stops propagation but does not open window if article_url is missing', () => {
+        mockOnClick.mockClear();
         const windowSpy = vi.spyOn(window, 'open').mockImplementation(() => {});
         const dataWithoutUrl = { ...mockData, article_url: '' };
         render(<Card data={dataWithoutUrl} onClick={mockOnClick} />);
