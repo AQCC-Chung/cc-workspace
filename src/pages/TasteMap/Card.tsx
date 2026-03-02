@@ -18,7 +18,8 @@ export default function Card({ data, onClick }: CardProps) {
     return (
         <div className="card" onClick={() => onClick(data)}>
             <div className="card-image-wrapper">
-                <img src={data.image} alt={data.name} className="card-image" />
+                {/* ⚡ Bolt: Added native lazy loading to images to improve initial render performance and reduce bandwidth consumption. */}
+                <img src={data.image} alt={data.name} className="card-image" loading="lazy" />
                 <div className="card-overlay">
                     <span className="card-category">{data.category}</span>
                     <span className="card-rating">★ {data.rating}</span>

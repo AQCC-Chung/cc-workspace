@@ -1,0 +1,3 @@
+## 2024-03-02 - Native Lazy Loading for External Images
+**Learning:** For components that load external images dynamically (like `TasteMap/Card` fetching unoptimized photos from Google Places/Unsplash), native browser image lazy loading (`loading="lazy"`) provides an extremely low-effort, zero-dependency, yet high-impact performance boost. It directly mitigates bandwidth waste and main-thread blocking during the initial render phase for grid layouts that extend below the fold.
+**Action:** Always verify if image components, especially in list/grid views or modals, are leveraging `loading="lazy"` when the images are non-critical to the initial above-the-fold viewport.
