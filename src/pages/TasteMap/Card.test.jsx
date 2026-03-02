@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Card from './Card';
 
 describe('Card Component', () => {
@@ -15,7 +15,8 @@ describe('Card Component', () => {
         article_url: 'https://example.com/article'
     };
 
-    const mockOnClick = vi.fn();
+    let mockOnClick = vi.fn();
+    beforeEach(() => { mockOnClick.mockClear(); });
 
     it('renders card with correct data', () => {
         render(<Card data={mockData} onClick={mockOnClick} />);
