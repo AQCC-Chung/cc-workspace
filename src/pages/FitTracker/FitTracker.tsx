@@ -158,6 +158,7 @@ const FitTracker: React.FC = () => {
             <button
               onClick={() => setShowSettings(true)}
               className="p-2 bg-slate-800 rounded-xl hover:bg-slate-700 transition-colors"
+              aria-label="開啟設定"
             >
               ⚙️
             </button>
