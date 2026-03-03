@@ -92,6 +92,9 @@ const SettingsModal: React.FC<Props> = ({
             <button
               onClick={() => setTtsEnabled(!ttsEnabled)}
               className={`w-12 h-7 rounded-full transition-all relative ${ttsEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
+              role="switch"
+              aria-checked={ttsEnabled}
+              aria-label="語音激勵"
             >
               <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-1 transition-all ${ttsEnabled ? 'left-6' : 'left-1'}`} />
             </button>
@@ -140,6 +143,9 @@ const SettingsModal: React.FC<Props> = ({
             <button
               onClick={() => setPeriodizationEnabled(!periodizationEnabled)}
               className={`w-12 h-7 rounded-full transition-all relative ${periodizationEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
+              role="switch"
+              aria-checked={periodizationEnabled}
+              aria-label="Smart Coach 週期"
             >
               <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-1 transition-all ${periodizationEnabled ? 'left-6' : 'left-1'}`} />
             </button>
