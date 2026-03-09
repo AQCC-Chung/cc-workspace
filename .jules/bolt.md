@@ -1,0 +1,3 @@
+## 2024-05-24 - N+1 Query Bottleneck in SQLite Loop
+**Learning:** Found a major performance bottleneck where the backend scraper performs an N+1 style query `SELECT id FROM recommendations WHERE name = ?` inside a python for-loop during database insertion, without any index on the `name` column. This causes a full table scan for every scraped item, resulting in O(N) lookup time per insert and scaling terribly as the database grows.
+**Action:** Always add a database index to fields used in `WHERE` clauses inside loops, transforming the O(N) lookup to O(log N) and significantly speeding up batch database inserts.

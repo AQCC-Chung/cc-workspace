@@ -22,6 +22,14 @@ def init_db():
             address TEXT
         )
     ''')
+
+    # ⚡ Bolt Optimization: Add indices for frequently queried fields
+    # 1. `idx_recommendations_name`: Turns O(N) full table scans into O(log N) lookups
+    #    during scraper's `SELECT id FROM recommendations WHERE name = ?` insertion loop.
+    # 2. `idx_recommendations_rating`: Speeds up `ORDER BY rating DESC` in API queries.
+    c.execute('CREATE INDEX IF NOT EXISTS idx_recommendations_name ON recommendations(name)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_recommendations_rating ON recommendations(rating DESC)')
+
     conn.commit()
     conn.close()
 

@@ -11,3 +11,4 @@ backend/*.db
 .vscode/
 .idea/
 cc-workspace/
+*.db
