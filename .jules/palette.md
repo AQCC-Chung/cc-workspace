@@ -1,0 +1,3 @@
+## 2024-05-18 - Added ARIA labels to FitTracker icon buttons
+**Learning:** Icon-only buttons (like `+`, `-`, `◀`, `▶`, `✕`) in the `FitTracker` app (specifically in `CalendarView` and `WeightTraining` components) were missing `aria-label`s, making them inaccessible to screen readers.
+**Action:** Always ensure that any button without explicit text content has a descriptive `aria-label` in Traditional Chinese (e.g., `aria-label="減少重量"`) to maintain accessibility across the application.
