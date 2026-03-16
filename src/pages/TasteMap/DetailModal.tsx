@@ -50,11 +50,12 @@ export default function DetailModal({ item, onClose }: DetailModalProps) {
                     </div>
 
                     <div className="modal-actions">
-                        <button className="btn-primary" onClick={() => window.open(item.source_url || `https://maps.google.com/?q=${item.name}+${item.location}`, '_blank')}>
+                        {/* Security: Prevent reverse tabnabbing by adding noopener,noreferrer */}
+                        <button className="btn-primary" onClick={() => window.open(item.source_url || `https://maps.google.com/?q=${item.name}+${item.location}`, '_blank', 'noopener,noreferrer')}>
                             🗺️ 在 Google Maps 上查看
                         </button>
                         {item.article_url && (
-                            <button className="btn-article" onClick={() => window.open(item.article_url, '_blank')}>
+                            <button className="btn-article" onClick={() => window.open(item.article_url, '_blank', 'noopener,noreferrer')}>
                                 📖 閱讀原文推薦
                             </button>
                         )}
