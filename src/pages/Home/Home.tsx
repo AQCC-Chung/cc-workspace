@@ -34,6 +34,14 @@ const FEATURES = [
         accent: 'var(--accent-purple)',
         ready: true,
     },
+    {
+        icon: '📈',
+        title: '台股波段監控',
+        desc: '整合 Z-Score、TD九轉、AVWAP 與投信籌碼，自動產生短線波段訊號。',
+        to: '/stock',
+        accent: 'var(--accent-green)',
+        ready: true,
+    },
 ]
 
 export default function Home() {

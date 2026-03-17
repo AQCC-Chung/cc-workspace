@@ -1,9 +1,9 @@
-import os
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
 from dotenv import load_dotenv
 import scraper
+import stock_monitor
 
 load_dotenv()
 
@@ -50,6 +50,26 @@ def search_recommendations(
         'has_more': has_more,
         'page': page,
     }
+
+@app.get("/api/stock/scan")
+def stock_scan(
+    tickers: str = Query(..., description="逗號分隔的台股代號，如 2330,2317,0050"),
+):
+    """掃描台股標的，回傳技術指標與籌碼面訊號。"""
+    ticker_list = [t.strip() for t in tickers.split(",") if t.strip()]
+    if not ticker_list:
+        return {"error": "tickers 不可為空"}
+    return stock_monitor.run_scan(ticker_list)
+
+
+@app.get("/api/stock/chart/{ticker}")
+def stock_chart(
+    ticker: str,
+    interval: str = Query("1d", description="1d | 1h | 1m"),
+):
+    """取得台股 K 線圖資料（含大盤 ^TWII 用於 RS Line）。"""
+    return stock_monitor.get_chart_data(ticker, interval)
+
 
 @app.get("/health")
 def health_check():

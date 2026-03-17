@@ -8,6 +8,7 @@ const NAV_ITEMS = [
     { to: '/flights', icon: '✈️', label: '機票搜尋' },
     { to: '/gym', icon: '💪', label: 'FitTracker' },
     { to: '/meetnote', icon: '🎙️', label: 'MeetNote' },
+    { to: '/stock', icon: '📈', label: '波段監控' },
 ]
 
 export default function Navbar() {
