@@ -180,6 +180,11 @@
   color: var(--accent-gold);
 }
 
+.sm-chip-name {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
 .sm-chip-meta {
   color: var(--text-secondary);
   font-size: 0.8rem;
@@ -273,6 +278,15 @@
   font-weight: 700;
   color: var(--text-primary) !important;
   font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.td-name {
+  display: block;
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
 }
 
 .td-positive { color: var(--accent-green) !important; }

@@ -19,6 +19,29 @@ FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
 TAX = 0.003
 FEE = 0.001425
 
+# ──────────────────────────────────────────
+# 台股名稱對照表
+# ──────────────────────────────────────────
+TW_STOCK_NAMES: dict[str, str] = {
+    "0050": "元大台灣50", "0056": "元大高股息",
+    "2330": "台積電",  "2454": "聯發科",  "3711": "日月光投控",
+    "3034": "聯詠",    "2344": "華邦電",  "3008": "大立光",
+    "6488": "環球晶",  "2337": "旺宏",    "6415": "矽力-KY",
+    "2317": "鴻海",    "2382": "廣達",    "2357": "華碩",
+    "4938": "和碩",    "2376": "技嘉",    "2377": "微星",
+    "3231": "緯創",    "2353": "宏碁",    "2308": "台達電",
+    "2301": "光寶科",  "2395": "研華",    "2379": "瑞昱",
+    "6669": "緯穎",    "2474": "可成",    "3702": "大聯大",
+    "2412": "中華電",  "3045": "台灣大",  "4904": "遠傳",
+    "2882": "國泰金",  "2881": "富邦金",  "2886": "兆豐金",
+    "2891": "中信金",  "2892": "第一金",  "2884": "玉山金",
+    "2885": "元大金",  "5880": "合庫金",  "1301": "台塑",
+    "1303": "南亞",    "1326": "台化",    "6505": "台塑化",
+    "1101": "台泥",    "1102": "亞泥",    "2002": "中鋼",
+    "2603": "長榮",    "2609": "陽明",    "2615": "萬海",
+    "2912": "統一超",  "2207": "和泰車",  "1216": "統一",
+}
+
 
 # ──────────────────────────────────────────
 # 工具
@@ -64,12 +87,12 @@ def _check_liquidity(df: pd.DataFrame) -> tuple[bool, str]:
 # ──────────────────────────────────────────
 
 def _get_stock_data(ticker_tw: str, period: str = "120d", interval: str = "1d") -> pd.DataFrame | None:
+    """用 Ticker.history() 下載台股資料，比 download() 更可靠。"""
     try:
-        df = yf.download(f"{ticker_tw}.TW", period=period, interval=interval,
-                         auto_adjust=True, progress=False)
+        t = yf.Ticker(f"{ticker_tw}.TW")
+        df = t.history(period=period, interval=interval, auto_adjust=True)
         if df is None or df.empty:
             return None
-        df = _flatten_columns(df)
         df = df[["Close", "High", "Low", "Volume"]].copy()
         df.dropna(inplace=True)
         return df
@@ -373,6 +396,7 @@ def scan_ticker(ticker: str) -> dict:
     """掃描單一標的，回傳指標 dict。"""
     base: dict = {
         "ticker": ticker,
+        "name": TW_STOCK_NAMES.get(ticker, ""),
         "close": None,
         "avwap": None,
         "net_buy": None,
@@ -483,20 +507,19 @@ def get_chart_data(ticker: str, interval: str) -> dict:
     """
     取得圖表原始 OHLCV 資料，含大盤 ^TWII（用於 RS Line）。
     interval: "1d" → 6 個月；"1h" → 60 天；"1m" → 7 天
-    股票 + 大盤並行下載，加速回應。
+    使用 Ticker.history() 以取得更可靠的台股資料。
     """
     period_map = {"1d": "6mo", "1h": "60d", "1m": "7d"}
     period = period_map.get(interval, "6mo")
 
     ticker_yf = f"{ticker}.TW"
+    name = TW_STOCK_NAMES.get(ticker, "")
 
     def dl_stock():
-        return yf.download(ticker_yf, period=period, interval=interval,
-                           auto_adjust=True, progress=False)
+        return yf.Ticker(ticker_yf).history(period=period, interval=interval, auto_adjust=True)
 
     def dl_market():
-        return yf.download("^TWII", period=period, interval=interval,
-                           auto_adjust=True, progress=False)
+        return yf.Ticker("^TWII").history(period=period, interval=interval, auto_adjust=True)
 
     # 並行下載，各設 25s timeout
     with ThreadPoolExecutor(max_workers=2) as ex:
@@ -505,86 +528,76 @@ def get_chart_data(ticker: str, interval: str) -> dict:
         try:
             df = f_stock.result(timeout=25)
         except Exception as e:
-            return {"data": [], "error": str(e)}
+            return {"data": [], "name": name, "error": str(e)}
         try:
             mdf = f_mkt.result(timeout=25)
         except Exception:
             mdf = None
 
     if df is None or df.empty:
-        return {"data": [], "error": f"無法取得 {ticker} 資料"}
+        return {"data": [], "name": name, "error": f"無法取得 {ticker} 資料"}
     try:
-        df = _flatten_columns(df)
         df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
         df.dropna(subset=["Close"], inplace=True)
     except Exception as e:
-        return {"data": [], "error": str(e)}
+        return {"data": [], "name": name, "error": str(e)}
 
     # 大盤資料 for RS Line
     try:
-        if mdf is not None and not mdf.empty:
-            mdf = _flatten_columns(mdf)
-            market_series = mdf["Close"].dropna()
-        else:
-            market_series = pd.Series(dtype=float)
+        market_series = mdf["Close"].dropna() if (mdf is not None and not mdf.empty) else pd.Series(dtype=float)
     except Exception:
         market_series = pd.Series(dtype=float)
 
-    # 對齊大盤時間戳（正規化為字串 key 避免 tz-aware vs tz-naive 不吻合）
+    # 時間戳正規化：日K 取日期字串，盤中取台灣時間字串
     def _ts_key(ts) -> str:
         try:
-            if ts.tzinfo is not None:
-                ts = ts.tz_convert("UTC").tz_localize(None)
-        except Exception:
-            pass
-        try:
-            return ts.strftime("%Y-%m-%d") if interval == "1d" else ts.strftime("%Y-%m-%d %H:%M")
+            if interval == "1d":
+                # .date() 直接取本地日期，不受 tz-aware/tz-naive 影響
+                return ts.date().isoformat()
+            else:
+                # 盤中：轉成台灣時間
+                if hasattr(ts, "tz_convert") and ts.tzinfo is not None:
+                    return ts.tz_convert("Asia/Taipei").strftime("%Y-%m-%d %H:%M")
+                return ts.strftime("%Y-%m-%d %H:%M")
         except Exception:
             s = str(ts)
             return s[:10] if interval == "1d" else s[:16]
 
-    market_map: dict = {}
-    for ts, val in market_series.items():
-        market_map[_ts_key(ts)] = float(val)
+    market_map: dict = {_ts_key(ts): float(val) for ts, val in market_series.items()}
 
     points = []
-    import pytz
-    tw_tz = pytz.timezone("Asia/Taipei")
     for ts, row in df.iterrows():
-        # 時間格式
-        if hasattr(ts, "to_pydatetime"):
-            dt = ts.to_pydatetime()
-        else:
-            dt = ts
-        # 台灣 UTC+8
+        # 顯示時間字串（台灣時區）
         if interval == "1d":
-            time_str = dt.strftime("%Y-%m-%d")
+            time_str = ts.date().isoformat()
         else:
             try:
-                if dt.tzinfo is None:
-                    dt_tw = dt.replace(tzinfo=pytz.utc).astimezone(tw_tz)
+                if hasattr(ts, "tz_convert") and ts.tzinfo is not None:
+                    dt_tw = ts.tz_convert("Asia/Taipei")
+                elif ts.tzinfo is None:
+                    dt_tw = ts.tz_localize("UTC").tz_convert("Asia/Taipei")
                 else:
-                    dt_tw = dt.astimezone(tw_tz)
+                    dt_tw = ts
                 time_str = dt_tw.strftime("%m-%d %H:%M")
             except Exception:
-                time_str = dt.strftime("%m-%d %H:%M")
+                time_str = str(ts)[:16]
 
         close_val = float(row["Close"]) if not pd.isna(row["Close"]) else None
-        market_close = market_map.get(_ts_key(ts), None)
+        market_close = market_map.get(_ts_key(ts))
 
         points.append({
             "time": time_str,
             "price": round(close_val, 2) if close_val is not None else None,
-            "open": round(float(row["Open"]), 2) if not pd.isna(row["Open"]) else None,
-            "high": round(float(row["High"]), 2) if not pd.isna(row["High"]) else None,
-            "low": round(float(row["Low"]), 2) if not pd.isna(row["Low"]) else None,
+            "open":  round(float(row["Open"]),   2) if not pd.isna(row["Open"])   else None,
+            "high":  round(float(row["High"]),   2) if not pd.isna(row["High"])   else None,
+            "low":   round(float(row["Low"]),    2) if not pd.isna(row["Low"])    else None,
             "close": round(close_val, 2) if close_val is not None else None,
             "volume": int(row["Volume"]) if not pd.isna(row["Volume"]) else 0,
             "marketClose": round(market_close, 2) if market_close is not None else None,
         })
 
     points = [p for p in points if p["price"] is not None]
-    return {"data": points, "error": None}
+    return {"data": points, "name": name, "error": None}
 
 
 # ──────────────────────────────────────────

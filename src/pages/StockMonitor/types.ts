@@ -6,6 +6,7 @@ export interface WatchlistItem {
 
 export interface TickerResult {
   ticker: string
+  name: string | null
   close: number | null
   avwap: number | null
   net_buy: number | null
@@ -43,5 +44,6 @@ export interface ChartPoint {
 
 export interface ChartResponse {
   data: ChartPoint[]
+  name: string | null
   error: string | null
 }

@@ -10,6 +10,27 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const STORAGE_KEY = 'stockMonitor_watchlist'
 const HISTORY_KEY = 'stockMonitor_history'
 
+// ── 台股名稱（前端備份，掃描結果會覆蓋）────────────────
+const TW_NAMES: Record<string, string> = {
+  '0050': '元大台灣50', '0056': '元大高股息',
+  '2330': '台積電',  '2454': '聯發科',  '3711': '日月光投控',
+  '3034': '聯詠',    '2344': '華邦電',  '3008': '大立光',
+  '6488': '環球晶',  '2337': '旺宏',    '6415': '矽力-KY',
+  '2317': '鴻海',    '2382': '廣達',    '2357': '華碩',
+  '4938': '和碩',    '2376': '技嘉',    '2377': '微星',
+  '3231': '緯創',    '2353': '宏碁',    '2308': '台達電',
+  '2301': '光寶科',  '2395': '研華',    '2379': '瑞昱',
+  '6669': '緯穎',    '2474': '可成',    '3702': '大聯大',
+  '2412': '中華電',  '3045': '台灣大',  '4904': '遠傳',
+  '2882': '國泰金',  '2881': '富邦金',  '2886': '兆豐金',
+  '2891': '中信金',  '2892': '第一金',  '2884': '玉山金',
+  '2885': '元大金',  '5880': '合庫金',  '1301': '台塑',
+  '1303': '南亞',    '1326': '台化',    '6505': '台塑化',
+  '1101': '台泥',    '1102': '亞泥',    '2002': '中鋼',
+  '2603': '長榮',    '2609': '陽明',    '2615': '萬海',
+  '2912': '統一超',  '2207': '和泰車',  '1216': '統一',
+}
+
 // ── 訊號 class 映射 ────────────────────────────────────
 const SIGNAL_CLASS: Record<string, string> = {
   '滿分買進': 'signal-buy',
@@ -132,7 +153,7 @@ function CandleShape(props: any) {
   const { open, high, low, close } = payload
   const range = high - low
   const isUp = close >= open
-  const color = isUp ? '#34d399' : '#f472b6'
+  const color = isUp ? '#ef4444' : '#22c55e'  // 台股：紅漲綠跌
   const cx = x + width / 2
   const bw = Math.max(2, Math.min(width * 0.75, 12))
   if (range === 0 || height <= 0) {
@@ -218,6 +239,7 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
   }, [ticker])
   const [interval, setInterval] = useState<Interval>('1d')
   const [rawData, setRawData] = useState<ChartPoint[]>([])
+  const [chartName, setChartName] = useState<string>(TW_NAMES[ticker] ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showBB, setShowBB] = useState(true)
@@ -237,7 +259,7 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
     setLoading(true); setError(null)
     fetch(`${API_BASE}/api/stock/chart/${ticker}?interval=${interval}`, { signal: controller.signal })
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then(d => { if (!cancelled) { setRawData(d.data ?? []); setLoading(false) } })
+      .then(d => { if (!cancelled) { setRawData(d.data ?? []); if (d.name) setChartName(d.name); setLoading(false) } })
       .catch(e => { if (!cancelled) { setError(e.name === 'AbortError' ? '伺服器無回應（逾時），請稍後再試' : e.message); setLoading(false) } })
     return () => { cancelled = true; clearTimeout(timeoutId); controller.abort() }
   }, [ticker, interval])
@@ -352,7 +374,7 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
   return (
     <section ref={sectionRef} className="sm-section sm-chart-section">
       <div className="sm-chart-header">
-        <h2>{ticker} 圖表</h2>
+        <h2>{ticker}{chartName ? ` ${chartName}` : ''} 圖表</h2>
         {signal && (
           <span className={`sm-signal ${SIGNAL_CLASS[signal] ?? 'signal-neutral'}`}
             style={{ fontSize: '0.82rem' }}>
@@ -476,7 +498,7 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
                   formatter={(v: number) => [v.toLocaleString(), '成交量']} />
                 <Bar dataKey="volume" isAnimationActive={false} name="量">
                   {displayData.map((d, i) => (
-                    <Cell key={i} fill={(d.close ?? 0) >= (d.open ?? 0) ? '#34d399' : '#f472b6'} opacity={0.6} />
+                    <Cell key={i} fill={(d.close ?? 0) >= (d.open ?? 0) ? '#ef4444' : '#22c55e'} opacity={0.6} />
                   ))}
                 </Bar>
               </ComposedChart>
@@ -842,6 +864,7 @@ export default function StockMonitor() {
                 className={`sm-chip${chartTicker === item.ticker ? ' sm-chip-active' : ''}`}
                 onClick={() => openChart(item.ticker)}>
                 <span className="sm-chip-ticker">{item.ticker}</span>
+                {TW_NAMES[item.ticker] && <span className="sm-chip-name">{TW_NAMES[item.ticker]}</span>}
                 {item.entryPrice > 0 && <span className="sm-chip-meta">@{item.entryPrice}</span>}
                 {item.shares > 0 && <span className="sm-chip-meta">{item.shares}張</span>}
                 <button className="sm-chip-edit" onClick={e => {
@@ -911,7 +934,12 @@ export default function StockMonitor() {
                   return (
                     <tr key={row.ticker} className={row.error ? 'row-error' : ''}
                       style={{ cursor: 'pointer' }} onClick={() => openChart(row.ticker)}>
-                      <td className="td-ticker">{row.ticker}</td>
+                      <td className="td-ticker">
+                        {row.ticker}
+                        {(row.name || TW_NAMES[row.ticker]) && (
+                          <span className="td-name">{row.name || TW_NAMES[row.ticker]}</span>
+                        )}
+                      </td>
                       <td>{row.close ?? '—'}</td>
                       <td>{row.avwap ?? '—'}</td>
                       <td className={row.net_buy !== null ? row.net_buy > 0 ? 'td-positive' : row.net_buy < 0 ? 'td-negative' : '' : ''}>
@@ -1032,7 +1060,12 @@ export default function StockMonitor() {
                     <tbody>
                       {screenerData.results.map(r => (
                         <tr key={r.ticker} style={{ cursor: 'pointer' }} onClick={() => openChart(r.ticker)}>
-                          <td className="td-ticker">{r.ticker}</td>
+                          <td className="td-ticker">
+                            {r.ticker}
+                            {(r.name || TW_NAMES[r.ticker]) && (
+                              <span className="td-name">{r.name || TW_NAMES[r.ticker]}</span>
+                            )}
+                          </td>
                           <td>{r.close ?? '—'}</td>
                           <td className={r.rsi !== null ? r.rsi < 30 ? 'td-positive' : r.rsi > 70 ? 'td-negative' : '' : ''}>
                             {r.rsi !== null ? r.rsi.toFixed(1) : '—'}
