@@ -1109,6 +1109,10 @@ export default function StockMonitor() {
             <p>從60日最低點起算的累積成交量均價，代表持有成本中樞。股價近AVWAP（≤2%）且反彈，為支撐確認買點。自訂錨點可從任意K棒重算。</p>
           </div>
           <div className="sm-doc-card">
+            <div className="sm-doc-title">POC（成交量密集區）</div>
+            <p>Point of Control，從錨點（60日最低點）起算，將所有K棒按價格分箱後累積成交量，取量最大的價格作為 POC（紫色虛線）。代表市場持倉成本最集中的位置，回測守住是強支撐，跌穿則是換手警示。</p>
+          </div>
+          <div className="sm-doc-card">
             <div className="sm-doc-title">ATR（真實波幅）</div>
             <p>14日平均真實波幅，衡量波動大小。停損設於 收盤 - 2×ATR，讓噪音不觸發停損。ATR也用於計算RR比。</p>
           </div>
