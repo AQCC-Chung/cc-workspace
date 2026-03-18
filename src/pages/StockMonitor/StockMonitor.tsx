@@ -276,16 +276,27 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
       return cumVol === 0 ? d.price : cumVP / cumVol
     })
 
-    // POC
+    // POC：將每根 K 棒的成交量均勻分攤到 High～Low 各箱子
     const pocData = rawData.slice(anchorIdx)
     const bins: Record<number, number> = {}
-    let maxVol = 0, pocPrice = 0
     pocData.forEach(d => {
+      const h = d.high ?? d.price ?? 0
+      const l = d.low ?? d.price ?? 0
+      const v = d.volume
       const bs = (d.price ?? 0) > 100 ? 1 : 0.5
-      const bin = Math.round((d.price ?? 0) / bs) * bs
-      bins[bin] = (bins[bin] || 0) + d.volume
-      if (bins[bin] > maxVol) { maxVol = bins[bin]; pocPrice = bin }
+      const loB = Math.ceil(l / bs) * bs
+      const hiB = Math.floor(h / bs) * bs
+      const count = Math.round((hiB - loB) / bs) + 1
+      const volPerBin = count > 0 ? v / count : v
+      for (let price = loB; price <= hiB + bs * 0.01; price += bs) {
+        const bin = +price.toFixed(2)
+        bins[bin] = (bins[bin] || 0) + volPerBin
+      }
     })
+    let maxVol = 0, pocPrice = 0
+    for (const [bin, vol] of Object.entries(bins)) {
+      if (vol > maxVol) { maxVol = vol; pocPrice = +bin }
+    }
 
     const rsArr = rawData.map(d =>
       d.marketClose && d.marketClose > 0 ? (d.price ?? 0) / d.marketClose * 100 : null
