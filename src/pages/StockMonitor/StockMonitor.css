@@ -559,6 +559,135 @@
   border: 1px solid rgba(52, 211, 153, 0.2);
 }
 
+/* ── Header right ────────────────────────── */
+.sm-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.sm-auto-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.sm-auto-controls {
+  display: flex;
+  gap: 0.25rem;
+}
+
+/* ── Watchlist actions ───────────────────── */
+.sm-watchlist-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sm-btn-sm {
+  font-size: 0.78rem !important;
+  padding: 0.35rem 0.75rem !important;
+}
+
+/* ── Sort ────────────────────────────────── */
+.sm-th-sort {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.sm-th-sort:hover { color: var(--accent-gold); }
+
+.sm-sort-icon {
+  font-size: 0.7rem;
+  opacity: 0.4;
+  margin-left: 0.2rem;
+}
+.sm-sort-icon.active {
+  opacity: 1;
+  color: var(--accent-gold);
+}
+
+/* ── Portfolio summary ───────────────────── */
+.sm-portfolio {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.sm-portfolio-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 120px;
+}
+
+.sm-portfolio-item span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.sm-portfolio-item strong {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ── Scan history ────────────────────────── */
+.sm-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.sm-history-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.sm-history-entry:last-child { border-bottom: none; }
+
+.sm-history-time {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.sm-history-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.sm-history-chip {
+  font-size: 0.75rem !important;
+  padding: 0.1rem 0.5rem !important;
+}
+
+/* ── Chart additions ─────────────────────── */
+.sm-chart-vol {
+  height: 70px;
+  width: 100%;
+}
+
+.sm-anchor-hint {
+  font-size: 0.8rem;
+  color: var(--accent-gold);
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px dashed rgba(212, 175, 55, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
 /* ── Responsive ──────────────────────────── */
 @media (max-width: 600px) {
   .sm-page { padding: 1.2rem 1rem 3rem; }

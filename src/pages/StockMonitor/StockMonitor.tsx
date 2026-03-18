@@ -8,6 +8,7 @@ import './StockMonitor.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const STORAGE_KEY = 'stockMonitor_watchlist'
+const HISTORY_KEY = 'stockMonitor_history'
 
 // ── 訊號 class 映射 ────────────────────────────────────
 const SIGNAL_CLASS: Record<string, string> = {
@@ -36,7 +37,14 @@ const SIGNAL_ICON: Record<string, string> = {
   '支撐確認': '⊕ ',
 }
 
-// ── Watchlist 持久化 ──────────────────────────────────
+interface ScanHistory {
+  timestamp: string
+  results: TickerResult[]
+}
+
+type SortKey = 'score' | 'rsi' | 'zscore' | 'td_count' | 'rr_ratio' | 'pnl' | null
+
+// ── 持久化 ──────────────────────────────────────────
 function loadWatchlist(): WatchlistItem[] {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') }
   catch { return [] }
@@ -44,23 +52,24 @@ function loadWatchlist(): WatchlistItem[] {
 function saveWatchlist(list: WatchlistItem[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
 }
+function loadHistory(): ScanHistory[] {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') }
+  catch { return [] }
+}
 
-// ── P&L 計算 ──────────────────────────────────────────
+// ── P&L 計算 ─────────────────────────────────────────
 function pnlPct(close: number, entry: number): number {
   if (entry === 0) return 0
   const gross = (close - entry) / entry
   return Math.round((gross - 0.003 - 0.001425 * 2) * 10000) / 100
 }
 
-// ── 圖表指標計算（client-side）──────────────────────
+// ── 圖表指標計算 ──────────────────────────────────────
 function calcEMA(prices: number[], span: number): number[] {
   const k = 2 / (span + 1)
   const out: number[] = []
   let ema = prices[0]
-  for (const p of prices) {
-    ema = (p - ema) * k + ema
-    out.push(ema)
-  }
+  for (const p of prices) { ema = (p - ema) * k + ema; out.push(ema) }
   return out
 }
 
@@ -72,13 +81,8 @@ function calcRSI(prices: number[], period = 14): (number | null)[] {
     const g = ch > 0 ? ch : 0
     const l = ch < 0 ? -ch : 0
     if (i < period) { avgGain += g; avgLoss += l }
-    else if (i === period) {
-      avgGain = (avgGain + g) / period
-      avgLoss = (avgLoss + l) / period
-    } else {
-      avgGain = (avgGain * (period - 1) + g) / period
-      avgLoss = (avgLoss * (period - 1) + l) / period
-    }
+    else if (i === period) { avgGain = (avgGain + g) / period; avgLoss = (avgLoss + l) / period }
+    else { avgGain = (avgGain * (period - 1) + g) / period; avgLoss = (avgLoss * (period - 1) + l) / period }
     if (i >= period) out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss)
   }
   return out
@@ -96,7 +100,52 @@ function calcATR(high: number[], low: number[], close: number[], period = 14): (
   return out
 }
 
-// ── 新增/編輯 Modal ──────────────────────────────────
+function calcBB(prices: number[], period = 20, mult = 2) {
+  return prices.map((_, i) => {
+    if (i < period - 1) return { bb_upper: null as number | null, bb_mid: null as number | null, bb_lower: null as number | null }
+    const slice = prices.slice(i - period + 1, i + 1)
+    const mean = slice.reduce((a, b) => a + b, 0) / period
+    const std = Math.sqrt(slice.reduce((s, p) => s + (p - mean) ** 2, 0) / period)
+    return {
+      bb_upper: +(mean + mult * std).toFixed(2),
+      bb_mid: +mean.toFixed(2),
+      bb_lower: +(mean - mult * std).toFixed(2),
+    }
+  })
+}
+
+function fmtCountdown(secs: number): string {
+  const m = Math.floor(secs / 60)
+  return `${m}:${String(secs % 60).padStart(2, '0')}`
+}
+
+// ── 蠟燭圖 Shape ─────────────────────────────────────
+function CandleShape(props: any) {
+  const { x, y, width, height, payload } = props
+  if (!payload || !width) return null
+  const { open, high, low, close } = payload
+  const range = high - low
+  const isUp = close >= open
+  const color = isUp ? '#34d399' : '#f472b6'
+  const cx = x + width / 2
+  const bw = Math.max(2, Math.min(width * 0.75, 12))
+  if (range === 0 || height <= 0) {
+    return <line x1={cx - bw / 2} y1={y} x2={cx + bw / 2} y2={y} stroke={color} strokeWidth={1.5} />
+  }
+  const openPx = y + (high - open) / range * height
+  const closePx = y + (high - close) / range * height
+  const bodyTop = Math.min(openPx, closePx)
+  const bodyH = Math.max(1.5, Math.abs(closePx - openPx))
+  return (
+    <g>
+      <line x1={cx} y1={y} x2={cx} y2={y + height} stroke={color} strokeWidth={1} opacity={0.8} />
+      <rect x={cx - bw / 2} y={bodyTop} width={bw} height={bodyH}
+        fill={color} stroke={color} strokeWidth={0.5} fillOpacity={0.95} />
+    </g>
+  )
+}
+
+// ── 新增/編輯 Modal ───────────────────────────────────
 interface EditModalProps {
   initial: WatchlistItem | null
   onSave: (item: WatchlistItem) => void
@@ -108,7 +157,6 @@ function EditModal({ initial, onSave, onClose }: EditModalProps) {
   const [price, setPrice] = useState(initial?.entryPrice ? String(initial.entryPrice) : '')
   const [shares, setShares] = useState(initial?.shares ? String(initial.shares) : '')
   const tickerRef = useRef<HTMLInputElement>(null)
-
   useEffect(() => { tickerRef.current?.focus() }, [])
 
   function handleSubmit(e: React.FormEvent) {
@@ -147,6 +195,7 @@ function EditModal({ initial, onSave, onClose }: EditModalProps) {
 
 // ── K 線圖 Panel ──────────────────────────────────────
 type Interval = '1d' | '1h' | '1m'
+const MAX_CANDLES = 300
 
 interface ChartPanelProps {
   ticker: string
@@ -159,11 +208,16 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
   const [rawData, setRawData] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showBB, setShowBB] = useState(true)
+  const [anchorMode, setAnchorMode] = useState(false)
+  const [customAnchorIdx, setCustomAnchorIdx] = useState<number | null>(null)
+
+  // Reset anchor when ticker/interval changes
+  useEffect(() => { setCustomAnchorIdx(null); setAnchorMode(false) }, [ticker, interval])
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     fetch(`${API_BASE}/api/stock/chart/${ticker}?interval=${interval}`)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then(d => { if (!cancelled) { setRawData(d.data ?? []); setLoading(false) } })
@@ -171,7 +225,6 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
     return () => { cancelled = true }
   }, [ticker, interval])
 
-  // 計算所有指標（client-side）
   const processed = useMemo(() => {
     if (rawData.length === 0) return []
     const prices = rawData.map(d => d.price ?? 0)
@@ -179,51 +232,44 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
     const lows = rawData.map(d => d.low ?? d.price ?? 0)
     const volumes = rawData.map(d => d.volume)
 
-    // EMA 8 / 21 / 55
     const ema8 = calcEMA(prices, 8)
     const ema21 = calcEMA(prices, 21)
     const ema55 = calcEMA(prices, 55)
-
-    // MACD (12, 26, 9)
     const ema12 = calcEMA(prices, 12)
     const ema26 = calcEMA(prices, 26)
     const macdLine = ema12.map((v, i) => v - ema26[i])
     const signalLine = calcEMA(macdLine, 9)
     const macdHist = macdLine.map((v, i) => v - signalLine[i])
-
-    // RSI (14)
     const rsiArr = calcRSI(prices, 14)
-
-    // ATR (14)
     const atrArr = calcATR(highs, lows, prices, 14)
+    const bbArr = calcBB(prices, 20, 2)
 
-    // AVWAP — 錨點：60 日最低低點
+    // AVWAP anchor
     const lookback = Math.min(60, rawData.length)
-    let lowestLow = Infinity, anchorIdx = 0
+    let lowestLow = Infinity, autoAnchorIdx = 0
     for (let i = rawData.length - lookback; i < rawData.length; i++) {
-      if (lows[i] < lowestLow) { lowestLow = lows[i]; anchorIdx = i }
+      if (lows[i] < lowestLow) { lowestLow = lows[i]; autoAnchorIdx = i }
     }
+    const anchorIdx = customAnchorIdx !== null ? customAnchorIdx : autoAnchorIdx
     let cumVol = 0, cumVP = 0
     const avwapArr = rawData.map((d, i) => {
       if (i < anchorIdx) return null
       const tp = ((d.high ?? d.price ?? 0) + (d.low ?? d.price ?? 0) + (d.price ?? 0)) / 3
-      cumVol += volumes[i]
-      cumVP += tp * volumes[i]
+      cumVol += volumes[i]; cumVP += tp * volumes[i]
       return cumVol === 0 ? d.price : cumVP / cumVol
     })
 
-    // POC — 最高成交量價位（60日）
+    // POC
     const pocData = rawData.slice(anchorIdx)
     const bins: Record<number, number> = {}
     let maxVol = 0, pocPrice = 0
     pocData.forEach(d => {
-      const binSize = (d.price ?? 0) > 100 ? 1 : 0.5
-      const bin = Math.round((d.price ?? 0) / binSize) * binSize
+      const bs = (d.price ?? 0) > 100 ? 1 : 0.5
+      const bin = Math.round((d.price ?? 0) / bs) * bs
       bins[bin] = (bins[bin] || 0) + d.volume
       if (bins[bin] > maxVol) { maxVol = bins[bin]; pocPrice = bin }
     })
 
-    // RS Line vs ^TWII
     const rsArr = rawData.map(d =>
       d.marketClose && d.marketClose > 0 ? (d.price ?? 0) / d.marketClose * 100 : null
     )
@@ -241,8 +287,14 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
       avwap: avwapArr[i] !== null ? +avwapArr[i]!.toFixed(2) : null,
       poc: pocPrice,
       rs: rsArr[i] !== null ? +rsArr[i]!.toFixed(4) : null,
+      ...bbArr[i],
     }))
-  }, [rawData])
+  }, [rawData, customAnchorIdx])
+
+  const displayData = useMemo(() => {
+    if (processed.length <= MAX_CANDLES) return processed
+    return processed.slice(processed.length - MAX_CANDLES)
+  }, [processed])
 
   const INTERVALS: { value: Interval; label: string }[] = [
     { value: '1d', label: '日K' },
@@ -250,7 +302,14 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
     { value: '1m', label: '1分K' },
   ]
 
-  const latest = processed[processed.length - 1]
+  const latest = displayData[displayData.length - 1]
+
+  function handleChartClick(data: any) {
+    if (!anchorMode || data?.activeTooltipIndex === undefined) return
+    const offset = processed.length - displayData.length
+    setCustomAnchorIdx(offset + data.activeTooltipIndex)
+    setAnchorMode(false)
+  }
 
   return (
     <section className="sm-section sm-chart-section">
@@ -265,18 +324,34 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
             </button>
           ))}
         </div>
+        <button className={`sm-interval-btn${showBB ? ' active' : ''}`}
+          onClick={() => setShowBB(v => !v)} title="顯示/隱藏布林通道">布林</button>
+        <button className={`sm-interval-btn${anchorMode ? ' active' : ''}`}
+          onClick={() => setAnchorMode(v => !v)} title="點擊圖表設定 AVWAP 錨點">
+          {anchorMode ? '取消設錨' : '設定錨點'}
+        </button>
+        {customAnchorIdx !== null && (
+          <button className="sm-interval-btn" onClick={() => setCustomAnchorIdx(null)}
+            title="重置為 60 日最低點">重置錨點</button>
+        )}
         <button className="sm-btn sm-btn-ghost sm-chart-close" onClick={onClose}>✕ 關閉</button>
       </div>
+      {anchorMode && (
+        <p className="sm-anchor-hint">↓ 點擊下方圖表上任意 K 棒以設定 AVWAP 錨點</p>
+      )}
 
       {loading && <p className="sm-empty">載入中…</p>}
       {error && <p className="sm-empty" style={{ color: '#f472b6' }}>⚠ {error}</p>}
 
-      {!loading && !error && processed.length > 0 && (
+      {!loading && !error && displayData.length > 0 && (
         <>
-          {/* 主圖：價格 + EMA + AVWAP + POC */}
+          {/* 主圖：蠟燭 + EMA + AVWAP + BB + POC */}
           <div className="sm-chart-main">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={processed} margin={{ top: 4, right: 12, bottom: 0, left: 0 }}>
+              <ComposedChart data={displayData} syncId="sm-chart"
+                margin={{ top: 4, right: 12, bottom: 0, left: 0 }}
+                onClick={handleChartClick}
+                style={{ cursor: anchorMode ? 'crosshair' : 'default' }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="time" stroke="#444" tick={{ fill: '#888', fontSize: 11 }} minTickGap={40} />
                 <YAxis domain={['auto', 'auto']} stroke="#444" tick={{ fill: '#888', fontSize: 11 }} width={56} />
@@ -290,46 +365,79 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
                   <ReferenceLine y={entryPrice} stroke="#fb923c" strokeDasharray="6 3" strokeWidth={1.5}
                     label={{ value: `成本 ${entryPrice}`, position: 'insideTopRight', fill: '#fb923c', fontSize: 11 }} />
                 )}
-                <Line type="monotone" dataKey="price" stroke="#e2a832" strokeWidth={2} dot={false} isAnimationActive={false} name="價格" />
-                <Line type="monotone" dataKey="ema8" stroke="#60a5fa" strokeWidth={1.5} dot={false} isAnimationActive={false} name="EMA8" />
-                <Line type="monotone" dataKey="ema21" stroke="#fbbf24" strokeWidth={1.5} dot={false} isAnimationActive={false} name="EMA21" />
-                <Line type="monotone" dataKey="ema55" stroke="#a78bfa" strokeWidth={1.5} dot={false} isAnimationActive={false} name="EMA55" />
-                <Line type="monotone" dataKey="avwap" stroke="#34d399" strokeWidth={2} strokeDasharray="5 5" dot={false} isAnimationActive={false} name="AVWAP" />
-              </LineChart>
+                {showBB && <>
+                  <Line type="monotone" dataKey="bb_upper" stroke="#475569" strokeWidth={1}
+                    strokeDasharray="3 3" dot={false} isAnimationActive={false} name="BB上" />
+                  <Line type="monotone" dataKey="bb_lower" stroke="#475569" strokeWidth={1}
+                    strokeDasharray="3 3" dot={false} isAnimationActive={false} name="BB下" />
+                </>}
+                <Bar dataKey={(d: any) => [d.low, d.high]} shape={<CandleShape />}
+                  isAnimationActive={false} name="K線" />
+                <Line type="monotone" dataKey="ema8" stroke="#60a5fa" strokeWidth={1.5}
+                  dot={false} isAnimationActive={false} name="EMA8" />
+                <Line type="monotone" dataKey="ema21" stroke="#fbbf24" strokeWidth={1.5}
+                  dot={false} isAnimationActive={false} name="EMA21" />
+                <Line type="monotone" dataKey="ema55" stroke="#a78bfa" strokeWidth={1.5}
+                  dot={false} isAnimationActive={false} name="EMA55" />
+                <Line type="monotone" dataKey="avwap" stroke="#34d399" strokeWidth={2}
+                  strokeDasharray="5 5" dot={false} isAnimationActive={false} name="AVWAP" />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
 
           {/* 圖例 */}
           <div className="sm-chart-legend">
-            <span style={{ color: '#e2a832' }}>── 價格</span>
             <span style={{ color: '#60a5fa' }}>── EMA8</span>
             <span style={{ color: '#fbbf24' }}>── EMA21</span>
             <span style={{ color: '#a78bfa' }}>── EMA55</span>
             <span style={{ color: '#34d399' }}>╌╌ AVWAP</span>
             <span style={{ color: '#8b5cf6' }}>╌╌ POC</span>
-            {entryPrice && entryPrice > 0 && (
-              <span style={{ color: '#fb923c' }}>╌╌ 成本</span>
-            )}
+            {showBB && <span style={{ color: '#475569' }}>╌╌ BB(20,2)</span>}
+            {entryPrice && entryPrice > 0 && <span style={{ color: '#fb923c' }}>╌╌ 成本</span>}
+          </div>
+
+          {/* 成交量子圖 */}
+          <div className="sm-chart-sub-label">成交量</div>
+          <div className="sm-chart-vol">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={displayData} syncId="sm-chart"
+                margin={{ top: 2, right: 12, bottom: 0, left: 0 }}>
+                <XAxis dataKey="time" hide />
+                <YAxis stroke="#444" tick={{ fill: '#888', fontSize: 10 }} width={56}
+                  tickFormatter={(v: number) => v >= 1e8 ? `${(v / 1e8).toFixed(0)}億` : v >= 1e4 ? `${(v / 1e4).toFixed(0)}萬` : String(v)} />
+                <Tooltip contentStyle={{ background: '#14141e', border: '1px solid #333', fontSize: 11 }}
+                  itemStyle={{ color: '#ccc' }}
+                  formatter={(v: number) => [v.toLocaleString(), '成交量']} />
+                <Bar dataKey="volume" isAnimationActive={false} name="量">
+                  {displayData.map((d, i) => (
+                    <Cell key={i} fill={(d.close ?? 0) >= (d.open ?? 0) ? '#34d399' : '#f472b6'} opacity={0.6} />
+                  ))}
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
 
           {/* MACD 子圖 */}
           <div className="sm-chart-sub-label">MACD (12, 26, 9)</div>
           <div className="sm-chart-sub">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={processed} margin={{ top: 2, right: 12, bottom: 0, left: 0 }}>
+              <ComposedChart data={displayData} syncId="sm-chart"
+                margin={{ top: 2, right: 12, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis dataKey="time" hide />
-                <YAxis domain={['auto', 'auto']} stroke="#444" tick={{ fill: '#888', fontSize: 10 }} width={42} />
+                <YAxis domain={['auto', 'auto']} stroke="#444" tick={{ fill: '#888', fontSize: 10 }} width={56} />
                 <Tooltip contentStyle={{ background: '#14141e', border: '1px solid #333', fontSize: 11 }}
                   itemStyle={{ color: '#ccc' }} />
                 <ReferenceLine y={0} stroke="#555" />
                 <Bar dataKey="macdHist" isAnimationActive={false} name="Hist">
-                  {processed.map((entry, idx) => (
+                  {displayData.map((entry, idx) => (
                     <Cell key={idx} fill={entry.macdHist >= 0 ? '#34d399' : '#f472b6'} />
                   ))}
                 </Bar>
-                <Line type="monotone" dataKey="macdLine" stroke="#60a5fa" strokeWidth={1.5} dot={false} isAnimationActive={false} name="MACD" />
-                <Line type="monotone" dataKey="macdSignal" stroke="#fbbf24" strokeWidth={1.5} dot={false} isAnimationActive={false} name="Signal" />
+                <Line type="monotone" dataKey="macdLine" stroke="#60a5fa" strokeWidth={1.5}
+                  dot={false} isAnimationActive={false} name="MACD" />
+                <Line type="monotone" dataKey="macdSignal" stroke="#fbbf24" strokeWidth={1.5}
+                  dot={false} isAnimationActive={false} name="Signal" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -338,15 +446,17 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
           <div className="sm-chart-sub-label">RSI (14)</div>
           <div className="sm-chart-sub">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={processed} margin={{ top: 2, right: 12, bottom: 0, left: 0 }}>
+              <LineChart data={displayData} syncId="sm-chart"
+                margin={{ top: 2, right: 12, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis dataKey="time" hide />
-                <YAxis domain={[0, 100]} stroke="#444" tick={{ fill: '#888', fontSize: 10 }} width={42} ticks={[30, 50, 70]} />
+                <YAxis domain={[0, 100]} stroke="#444" tick={{ fill: '#888', fontSize: 10 }} width={56} ticks={[30, 50, 70]} />
                 <Tooltip contentStyle={{ background: '#14141e', border: '1px solid #333', fontSize: 11 }}
                   itemStyle={{ color: '#ccc' }} />
                 <ReferenceLine y={70} stroke="#f472b6" strokeDasharray="3 3" />
                 <ReferenceLine y={30} stroke="#34d399" strokeDasharray="3 3" />
-                <Line type="monotone" dataKey="rsi" stroke="#e2a832" strokeWidth={1.5} dot={false} isAnimationActive={false} name="RSI" />
+                <Line type="monotone" dataKey="rsi" stroke="#e2a832" strokeWidth={1.5}
+                  dot={false} isAnimationActive={false} name="RSI" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -355,13 +465,15 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
           <div className="sm-chart-sub-label">相對大盤強度 (RS vs ^TWII)</div>
           <div className="sm-chart-sub">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={processed} margin={{ top: 2, right: 12, bottom: 0, left: 0 }}>
+              <LineChart data={displayData} syncId="sm-chart"
+                margin={{ top: 2, right: 12, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis dataKey="time" hide />
-                <YAxis domain={['auto', 'auto']} stroke="#444" tick={{ fill: '#888', fontSize: 10 }} width={42} />
+                <YAxis domain={['auto', 'auto']} stroke="#444" tick={{ fill: '#888', fontSize: 10 }} width={56} />
                 <Tooltip contentStyle={{ background: '#14141e', border: '1px solid #333', fontSize: 11 }}
                   itemStyle={{ color: '#ccc' }} />
-                <Line type="monotone" dataKey="rs" stroke="#a78bfa" strokeWidth={1.5} dot={false} isAnimationActive={false} name="RS" />
+                <Line type="monotone" dataKey="rs" stroke="#a78bfa" strokeWidth={1.5}
+                  dot={false} isAnimationActive={false} name="RS" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -371,7 +483,7 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
   )
 }
 
-// ── 主頁面 ───────────────────────────────────────────
+// ── 主頁面 ────────────────────────────────────────────
 export default function StockMonitor() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(loadWatchlist)
   const [scanData, setScanData] = useState<ScanResponse | null>(null)
@@ -381,7 +493,55 @@ export default function StockMonitor() {
   const [showModal, setShowModal] = useState(false)
   const [chartTicker, setChartTicker] = useState<string | null>(null)
 
+  // Sort
+  const [sortKey, setSortKey] = useState<SortKey>('score')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  // Auto-scan
+  const [autoScan, setAutoScan] = useState(false)
+  const [autoInterval, setAutoInterval] = useState(5)
+  const [countdown, setCountdown] = useState(0)
+  const countdownRef = useRef(0)
+  const scanFnRef = useRef<() => void>(() => {})
+
+  // History
+  const [scanHistory, setScanHistory] = useState<ScanHistory[]>(loadHistory)
+  const [showHistory, setShowHistory] = useState(false)
+
+  // Import ref
+  const importRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => { saveWatchlist(watchlist) }, [watchlist])
+
+  // Always keep scan fn ref up-to-date
+  useEffect(() => { scanFnRef.current = handleScan })
+
+  // Auto-scan timer
+  useEffect(() => {
+    if (!autoScan) { countdownRef.current = 0; setCountdown(0); return }
+    countdownRef.current = autoInterval * 60
+    setCountdown(countdownRef.current)
+    const timer = setInterval(() => {
+      countdownRef.current = Math.max(0, countdownRef.current - 1)
+      setCountdown(countdownRef.current)
+      if (countdownRef.current === 0) {
+        countdownRef.current = autoInterval * 60
+        scanFnRef.current()
+      }
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [autoScan, autoInterval])
+
+  // Save scan to history
+  useEffect(() => {
+    if (!scanData) return
+    const entry: ScanHistory = { timestamp: scanData.scanned_at, results: scanData.results }
+    setScanHistory(prev => {
+      const next = [entry, ...prev.filter(h => h.timestamp !== entry.timestamp)].slice(0, 20)
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [scanData])
 
   function handleSave(item: WatchlistItem) {
     setWatchlist(prev => {
@@ -421,6 +581,79 @@ export default function StockMonitor() {
     setChartTicker(prev => prev === ticker ? null : ticker)
   }
 
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
+    else { setSortKey(key); setSortDir('desc') }
+  }
+
+  function handleExport() {
+    const blob = new Blob([JSON.stringify(watchlist, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `watchlist-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target?.result as string)
+        if (Array.isArray(data)) { setWatchlist(data); e.target.value = '' }
+      } catch { /* ignore invalid JSON */ }
+    }
+    reader.readAsText(file)
+  }
+
+  // Processed results (with pnl)
+  const processedResults = useMemo(() => {
+    if (!scanData) return []
+    return scanData.results.map(row => {
+      const w = getWatchItem(row.ticker)
+      const hasCost = w && w.entryPrice > 0 && row.close !== null
+      const pnl = hasCost ? pnlPct(row.close!, w!.entryPrice) : null
+      return { ...row, pnl, witem: w }
+    })
+  }, [scanData, watchlist])
+
+  // Sorted results
+  const sortedResults = useMemo(() => {
+    if (!sortKey) return processedResults
+    return [...processedResults].sort((a, b) => {
+      const getV = (r: typeof processedResults[0]): number => {
+        if (sortKey === 'pnl') return r.pnl ?? -Infinity
+        const v = r[sortKey as keyof TickerResult]
+        return typeof v === 'number' ? v : -Infinity
+      }
+      return sortDir === 'desc' ? getV(b) - getV(a) : getV(a) - getV(b)
+    })
+  }, [processedResults, sortKey, sortDir])
+
+  // Portfolio summary
+  const portfolio = useMemo(() => {
+    if (processedResults.length === 0) return null
+    let totalCost = 0, totalValue = 0, count = 0
+    processedResults.forEach(r => {
+      if (!r.witem?.entryPrice || !r.witem?.shares || !r.close) return
+      totalCost += r.witem.entryPrice * r.witem.shares * 1000
+      totalValue += r.close * r.witem.shares * 1000
+      count++
+    })
+    if (count === 0) return null
+    const pnl = totalValue - totalCost
+    const pct = totalCost > 0 ? pnl / totalCost * 100 : 0
+    return { totalValue, totalCost, pnl, pct }
+  }, [processedResults])
+
+  function sortIcon(key: SortKey) {
+    if (sortKey !== key) return <span className="sm-sort-icon">⇅</span>
+    return <span className="sm-sort-icon active">{sortDir === 'desc' ? '↓' : '↑'}</span>
+  }
+
   return (
     <div className="sm-page">
       {/* Header */}
@@ -432,13 +665,33 @@ export default function StockMonitor() {
             <p>整合技術指標與投信籌碼的短線訊號儀表板</p>
           </div>
         </div>
-        <button className="sm-btn sm-btn-scan" onClick={handleScan}
-          disabled={loading || watchlist.length === 0}>
-          {loading ? '⏳ 掃描中…' : '▶ 執行掃描'}
-        </button>
+        <div className="sm-header-right">
+          <button className="sm-btn sm-btn-scan" onClick={handleScan}
+            disabled={loading || watchlist.length === 0}>
+            {loading ? '⏳ 掃描中…' : '▶ 執行掃描'}
+          </button>
+          <div className="sm-auto-wrap">
+            <button className={`sm-interval-btn${autoScan ? ' active' : ''}`}
+              onClick={() => setAutoScan(v => !v)}
+              title="自動定時掃描">
+              {autoScan ? `⏱ ${fmtCountdown(countdown)}` : '自動掃描'}
+            </button>
+            {autoScan && (
+              <div className="sm-auto-controls">
+                {[3, 5, 10].map(m => (
+                  <button key={m}
+                    className={`sm-interval-btn${autoInterval === m ? ' active' : ''}`}
+                    onClick={() => { setAutoInterval(m); countdownRef.current = m * 60; setCountdown(m * 60) }}>
+                    {m}分
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </header>
 
-      {/* Systemic Risk Banner */}
+      {/* Banners */}
       {scanData?.systemic_risk && (
         <div className="sm-banner-risk">
           <span>⚠ {scanData.systemic_msg}</span>
@@ -457,10 +710,15 @@ export default function StockMonitor() {
       <section className="sm-section">
         <div className="sm-section-head">
           <h2>持倉清單 <span className="sm-count">{watchlist.length}</span></h2>
-          <button className="sm-btn sm-btn-add"
-            onClick={() => { setEditTarget(null); setShowModal(true) }}>
-            + 新增
-          </button>
+          <div className="sm-watchlist-actions">
+            <button className="sm-btn sm-btn-add"
+              onClick={() => { setEditTarget(null); setShowModal(true) }}>
+              + 新增
+            </button>
+            <button className="sm-btn sm-btn-ghost sm-btn-sm" onClick={handleExport}>⬇ 匯出</button>
+            <button className="sm-btn sm-btn-ghost sm-btn-sm" onClick={() => importRef.current?.click()}>⬆ 匯入</button>
+            <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
+          </div>
         </div>
         {watchlist.length === 0 ? (
           <p className="sm-empty">尚無標的，點擊「新增」加入</p>
@@ -493,9 +751,15 @@ export default function StockMonitor() {
       )}
 
       {/* Results Table */}
-      {scanData && scanData.results.length > 0 && (
+      {scanData && sortedResults.length > 0 && (
         <section className="sm-section">
-          <h2>掃描結果</h2>
+          <div className="sm-section-head">
+            <h2>掃描結果</h2>
+            <button className="sm-btn sm-btn-ghost sm-btn-sm"
+              onClick={() => setShowHistory(v => !v)}>
+              {showHistory ? '▲ 隱藏歷史' : '▼ 掃描歷史'}
+            </button>
+          </div>
           <div className="sm-table-wrap">
             <table className="sm-table">
               <thead>
@@ -504,59 +768,46 @@ export default function StockMonitor() {
                   <th>還原收盤</th>
                   <th>AVWAP</th>
                   <th>投信淨買(張)</th>
-                  <th>Z-Score</th>
-                  <th>TD</th>
-                  <th>RSI</th>
+                  <th className="sm-th-sort" onClick={() => toggleSort('zscore')}>Z-Score {sortIcon('zscore')}</th>
+                  <th className="sm-th-sort" onClick={() => toggleSort('td_count')}>TD {sortIcon('td_count')}</th>
+                  <th className="sm-th-sort" onClick={() => toggleSort('rsi')}>RSI {sortIcon('rsi')}</th>
                   <th>停損參考</th>
-                  <th>RR比</th>
-                  <th>得分</th>
+                  <th className="sm-th-sort" onClick={() => toggleSort('rr_ratio')}>RR比 {sortIcon('rr_ratio')}</th>
+                  <th className="sm-th-sort" onClick={() => toggleSort('score')}>得分 {sortIcon('score')}</th>
                   <th>成本</th>
-                  <th>未實現損益</th>
+                  <th className="sm-th-sort" onClick={() => toggleSort('pnl')}>未實現損益 {sortIcon('pnl')}</th>
                   <th>判定</th>
                 </tr>
               </thead>
               <tbody>
-                {scanData.results.map((row: TickerResult) => {
-                  const witem = getWatchItem(row.ticker)
+                {sortedResults.map((row) => {
+                  const { witem, pnl } = row
                   const hasCost = witem && witem.entryPrice > 0 && row.close !== null
-                  const pnl = hasCost ? pnlPct(row.close!, witem!.entryPrice) : null
                   const stopTriggered = hasCost && row.stop_loss !== null && row.close! < row.stop_loss
                   const takeProfitAlert = hasCost && pnl !== null && pnl >= 15 && row.rsi !== null && row.rsi > 75
-
                   return (
                     <tr key={row.ticker} className={row.error ? 'row-error' : ''}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => openChart(row.ticker)}>
+                      style={{ cursor: 'pointer' }} onClick={() => openChart(row.ticker)}>
                       <td className="td-ticker">{row.ticker}</td>
                       <td>{row.close ?? '—'}</td>
                       <td>{row.avwap ?? '—'}</td>
-                      <td className={row.net_buy !== null
-                        ? row.net_buy > 0 ? 'td-positive' : row.net_buy < 0 ? 'td-negative' : ''
-                        : ''}>
+                      <td className={row.net_buy !== null ? row.net_buy > 0 ? 'td-positive' : row.net_buy < 0 ? 'td-negative' : '' : ''}>
                         {row.net_buy !== null ? (row.net_buy > 0 ? '+' : '') + row.net_buy : '—'}
                       </td>
-                      <td className={row.zscore !== null
-                        ? row.zscore < -1.5 ? 'td-positive' : row.zscore > 2 ? 'td-negative' : ''
-                        : ''}>
+                      <td className={row.zscore !== null ? row.zscore < -1.5 ? 'td-positive' : row.zscore > 2 ? 'td-negative' : '' : ''}>
                         {row.zscore !== null ? row.zscore.toFixed(2) : '—'}
                       </td>
-                      <td className={row.td_count !== null
-                        ? row.td_count <= -8 ? 'td-positive' : row.td_count >= 9 ? 'td-negative' : ''
-                        : ''}>
+                      <td className={row.td_count !== null ? row.td_count <= -8 ? 'td-positive' : row.td_count >= 9 ? 'td-negative' : '' : ''}>
                         {row.td_count !== null ? row.td_count : '—'}
                       </td>
-                      <td className={row.rsi !== null
-                        ? row.rsi < 30 ? 'td-positive' : row.rsi > 70 ? 'td-negative' : ''
-                        : ''}>
+                      <td className={row.rsi !== null ? row.rsi < 30 ? 'td-positive' : row.rsi > 70 ? 'td-negative' : '' : ''}>
                         {row.rsi !== null ? row.rsi.toFixed(1) : '—'}
                       </td>
                       <td className="td-stop">
                         {row.stop_loss !== null ? row.stop_loss : '—'}
                         {stopTriggered && <span className="td-alert" title="ATR 停損觸發"> 🛑</span>}
                       </td>
-                      <td className={row.rr_ratio !== null
-                        ? row.rr_ratio >= 2.5 ? 'td-positive' : 'td-muted'
-                        : ''}>
+                      <td className={row.rr_ratio !== null ? row.rr_ratio >= 2.5 ? 'td-positive' : 'td-muted' : ''}>
                         {row.rr_ratio !== null ? row.rr_ratio.toFixed(1) : '—'}
                       </td>
                       <td>
@@ -582,10 +833,56 @@ export default function StockMonitor() {
               </tbody>
             </table>
           </div>
+
+          {/* Portfolio Summary */}
+          {portfolio && (
+            <div className="sm-portfolio">
+              <div className="sm-portfolio-item">
+                <span>總市值</span>
+                <strong>NT$ {portfolio.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+              </div>
+              <div className="sm-portfolio-item">
+                <span>總成本</span>
+                <strong>NT$ {portfolio.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+              </div>
+              <div className="sm-portfolio-item">
+                <span>未實現損益</span>
+                <strong className={portfolio.pnl >= 0 ? 'td-positive' : 'td-negative'}>
+                  {portfolio.pnl >= 0 ? '+' : ''}NT$ {Math.round(portfolio.pnl).toLocaleString()}
+                  <span style={{ marginLeft: '0.4rem', fontSize: '0.9em' }}>
+                    ({portfolio.pct >= 0 ? '+' : ''}{portfolio.pct.toFixed(2)}%)
+                  </span>
+                </strong>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
-      {/* 說明區 */}
+      {/* 掃描歷史 */}
+      {showHistory && scanHistory.length > 0 && (
+        <section className="sm-section sm-history-section">
+          <h2>掃描歷史 <span className="sm-count">{scanHistory.length}</span></h2>
+          <div className="sm-history-list">
+            {scanHistory.map((entry, i) => (
+              <div key={i} className="sm-history-entry">
+                <span className="sm-history-time">{entry.timestamp.replace('T', ' ')}</span>
+                <div className="sm-history-chips">
+                  {entry.results.map(r => (
+                    <span key={r.ticker}
+                      className={`sm-history-chip sm-signal ${SIGNAL_CLASS[r.signal ?? ''] ?? 'signal-neutral'}`}>
+                      {r.ticker}
+                      {r.score !== null ? ` ${r.score! > 0 ? '+' : ''}${r.score}` : ''}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 訊號說明 */}
       <section className="sm-section sm-legend">
         <h3>訊號說明</h3>
         <ul>
