@@ -133,7 +133,7 @@ function EditModal({ initial, onSave, onClose }: EditModalProps) {
           </label>
           <label>持倉張數
             <input type="number" value={shares} onChange={e => setShares(e.target.value)}
-              placeholder="可輸入小數，如 1.5" min="0" step="0.5" />
+              placeholder="可輸入小數，如 0.5、1.3" min="0" step="any" />
           </label>
           <div className="sm-modal-actions">
             <button type="button" className="sm-btn sm-btn-ghost" onClick={onClose}>取消</button>
