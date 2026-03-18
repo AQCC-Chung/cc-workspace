@@ -593,6 +593,26 @@ export default function StockMonitor() {
     })
   }, [scanData])
 
+  // Auto-fetch signal when chart opens for a ticker without existing scan data
+  useEffect(() => {
+    if (!chartTicker) return
+    const hasData = scanData?.results.find(r => r.ticker === chartTicker) ||
+                    screenerData?.results.find(r => r.ticker === chartTicker)
+    if (hasData) return
+    const controller = new AbortController()
+    fetch(`${API_BASE}/api/stock/scan?tickers=${chartTicker}`, { signal: controller.signal })
+      .then(r => r.json())
+      .then((data: ScanResponse) => {
+        setScanData(prev => {
+          if (!prev) return data
+          const others = prev.results.filter(r => r.ticker !== chartTicker)
+          return { ...prev, results: [...others, ...data.results] }
+        })
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [chartTicker]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleSave(item: WatchlistItem) {
     setWatchlist(prev => {
       const idx = prev.findIndex(w => w.ticker === item.ticker)
