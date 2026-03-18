@@ -227,12 +227,12 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
   useEffect(() => {
     let cancelled = false
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000)
+    const timeoutId = setTimeout(() => controller.abort(), 70000)
     setLoading(true); setError(null)
     fetch(`${API_BASE}/api/stock/chart/${ticker}?interval=${interval}`, { signal: controller.signal })
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then(d => { if (!cancelled) { setRawData(d.data ?? []); setLoading(false) } })
-      .catch(e => { if (!cancelled) { setError(e.name === 'AbortError' ? '請求逾時（30s），請稍後再試' : e.message); setLoading(false) } })
+      .catch(e => { if (!cancelled) { setError(e.name === 'AbortError' ? '伺服器無回應（逾時），請稍後再試' : e.message); setLoading(false) } })
     return () => { cancelled = true; clearTimeout(timeoutId); controller.abort() }
   }, [ticker, interval])
 
@@ -592,6 +592,8 @@ export default function StockMonitor() {
   async function handleScan() {
     if (watchlist.length === 0) { setError('請先新增標的'); return }
     setLoading(true); setError(null)
+    // 預先喚醒 Render 冷啟動（fire-and-forget）
+    fetch(`${API_BASE}/health`).catch(() => {})
     try {
       const tickers = watchlist.map(w => w.ticker).join(',')
       const res = await fetch(`${API_BASE}/api/stock/scan?tickers=${encodeURIComponent(tickers)}`)
