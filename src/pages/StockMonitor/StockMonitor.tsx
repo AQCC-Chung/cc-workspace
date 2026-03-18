@@ -226,12 +226,14 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
 
   useEffect(() => {
     let cancelled = false
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
     setLoading(true); setError(null)
-    fetch(`${API_BASE}/api/stock/chart/${ticker}?interval=${interval}`)
+    fetch(`${API_BASE}/api/stock/chart/${ticker}?interval=${interval}`, { signal: controller.signal })
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then(d => { if (!cancelled) { setRawData(d.data ?? []); setLoading(false) } })
-      .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
-    return () => { cancelled = true }
+      .catch(e => { if (!cancelled) { setError(e.name === 'AbortError' ? '請求逾時（30s），請稍後再試' : e.message); setLoading(false) } })
+    return () => { cancelled = true; clearTimeout(timeoutId); controller.abort() }
   }, [ticker, interval])
 
   const processed = useMemo(() => {

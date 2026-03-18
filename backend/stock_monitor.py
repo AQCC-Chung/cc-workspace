@@ -468,16 +468,37 @@ def get_chart_data(ticker: str, interval: str) -> dict:
     """
     取得圖表原始 OHLCV 資料，含大盤 ^TWII（用於 RS Line）。
     interval: "1d" → 6 個月；"1h" → 60 天；"1m" → 7 天
+    股票 + 大盤並行下載，加速回應。
     """
     period_map = {"1d": "6mo", "1h": "60d", "1m": "7d"}
     period = period_map.get(interval, "6mo")
 
     ticker_yf = f"{ticker}.TW"
+
+    def dl_stock():
+        return yf.download(ticker_yf, period=period, interval=interval,
+                           auto_adjust=True, progress=False)
+
+    def dl_market():
+        return yf.download("^TWII", period=period, interval=interval,
+                           auto_adjust=True, progress=False)
+
+    # 並行下載，各設 25s timeout
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        f_stock = ex.submit(dl_stock)
+        f_mkt = ex.submit(dl_market)
+        try:
+            df = f_stock.result(timeout=25)
+        except Exception as e:
+            return {"data": [], "error": str(e)}
+        try:
+            mdf = f_mkt.result(timeout=25)
+        except Exception:
+            mdf = None
+
+    if df is None or df.empty:
+        return {"data": [], "error": f"無法取得 {ticker} 資料"}
     try:
-        df = yf.download(ticker_yf, period=period, interval=interval,
-                         auto_adjust=True, progress=False)
-        if df is None or df.empty:
-            return {"data": [], "error": f"無法取得 {ticker} 資料"}
         df = _flatten_columns(df)
         df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
         df.dropna(subset=["Close"], inplace=True)
@@ -486,8 +507,6 @@ def get_chart_data(ticker: str, interval: str) -> dict:
 
     # 大盤資料 for RS Line
     try:
-        mdf = yf.download("^TWII", period=period, interval=interval,
-                          auto_adjust=True, progress=False)
         if mdf is not None and not mdf.empty:
             mdf = _flatten_columns(mdf)
             market_series = mdf["Close"].dropna()
