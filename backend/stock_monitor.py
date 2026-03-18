@@ -16,6 +16,7 @@ import yfinance as yf
 
 FINMIND_TOKEN = os.environ.get("FINMIND_TOKEN", "")
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 TAX = 0.003
 FEE = 0.001425
 
@@ -42,6 +43,62 @@ TW_STOCK_NAMES: dict[str, str] = {
     "2912": "統一超",  "2207": "和泰車",  "1216": "統一",
 }
 
+# ──────────────────────────────────────────
+# 台股板塊對照表  (ticker → (sector, industry))
+# ──────────────────────────────────────────
+TW_STOCK_SECTORS: dict[str, tuple[str, str]] = {
+    "0050": ("ETF", "大盤指數型"),
+    "0056": ("ETF", "高股息"),
+    "2330": ("半導體", "晶圓代工"),
+    "2454": ("半導體", "IC設計"),
+    "3711": ("半導體", "封測"),
+    "3034": ("半導體", "IC設計"),
+    "2344": ("半導體", "記憶體"),
+    "3008": ("半導體", "光學元件"),
+    "6488": ("半導體", "矽晶圓"),
+    "2337": ("半導體", "記憶體"),
+    "6415": ("半導體", "IC設計"),
+    "2379": ("半導體", "IC設計"),
+    "2317": ("電子製造", "EMS/ODM"),
+    "2382": ("電子製造", "伺服器/NB"),
+    "2357": ("電子製造", "PC/NB"),
+    "4938": ("電子製造", "EMS/ODM"),
+    "2376": ("電子製造", "主機板"),
+    "2377": ("電子製造", "主機板"),
+    "3231": ("電子製造", "伺服器"),
+    "2353": ("電子製造", "PC/NB"),
+    "2308": ("電子製造", "電源管理"),
+    "2301": ("電子製造", "電源管理"),
+    "2395": ("電子製造", "工業電腦"),
+    "6669": ("電子製造", "伺服器"),
+    "2474": ("電子製造", "金屬機殼"),
+    "3702": ("電子製造", "電子通路"),
+    "2412": ("電信", "行動通訊"),
+    "3045": ("電信", "行動通訊"),
+    "4904": ("電信", "行動通訊"),
+    "2882": ("金融", "壽險"),
+    "2881": ("金融", "壽險"),
+    "2886": ("金融", "銀行"),
+    "2891": ("金融", "銀行"),
+    "2892": ("金融", "銀行"),
+    "2884": ("金融", "銀行"),
+    "2885": ("金融", "證券"),
+    "5880": ("金融", "銀行"),
+    "1301": ("石化", "塑膠原料"),
+    "1303": ("石化", "塑膠原料"),
+    "1326": ("石化", "化學纖維"),
+    "6505": ("石化", "石油煉製"),
+    "1101": ("水泥", "水泥製造"),
+    "1102": ("水泥", "水泥製造"),
+    "2002": ("鋼鐵", "鋼鐵製造"),
+    "2603": ("航運", "航運"),
+    "2609": ("航運", "航運"),
+    "2615": ("航運", "航運"),
+    "2912": ("消費", "便利商店"),
+    "2207": ("消費", "汽車銷售"),
+    "1216": ("消費", "食品飲料"),
+}
+
 
 # ──────────────────────────────────────────
 # 工具
@@ -52,6 +109,24 @@ def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     return df
+
+
+def _call_gemini(prompt: str) -> str | None:
+    """呼叫 Gemini REST API 產生摘要；未設定 GEMINI_API_KEY 時回傳 None。"""
+    if not GEMINI_API_KEY:
+        return None
+    url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+           "gemini-2.0-flash:generateContent")
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": 512, "temperature": 0.25},
+    }
+    try:
+        r = requests.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=20)
+        r.raise_for_status()
+        return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception:
+        return None
 
 
 # ──────────────────────────────────────────
@@ -716,9 +791,107 @@ def get_stock_news(ticker: str, limit: int = 8) -> dict:
         except Exception:
             pass
 
+    # ── 板塊資訊 ───────────────────────────────
+    sector_tuple = TW_STOCK_SECTORS.get(ticker, ("", ""))
+    sector, industry = sector_tuple
+
+    # ── Gemini AI 摘要（平行跑，不阻塞新聞回傳）──
+    summary: str | None = None
+    if news_items and GEMINI_API_KEY:
+        name    = TW_STOCK_NAMES.get(ticker, ticker)
+        sector_tag = f"【{sector}/{industry}】" if sector else ""
+        news_text = "\n".join(
+            f"・{n['title']} ({n['publisher'] or ''} {n['time_str']})"
+            for n in news_items[:6]
+        )
+        prompt = (
+            f"你是台灣股市分析師。以下是 {ticker}（{name}）{sector_tag} 的最新相關新聞：\n\n"
+            f"{news_text}\n\n"
+            "請用繁體中文回覆：\n"
+            "【重點摘要】條列3-5個核心要點（每點一行，以・開頭）\n"
+            "【消息面判斷】偏多/中性/偏空 — 一句話說明整體市場反應方向"
+        )
+        summary = _call_gemini(prompt)
+
     if not news_items:
-        return {"news": [], "error": "查無新聞"}
-    return {"news": news_items[:limit], "error": None}
+        return {"news": [], "summary": None, "sector": sector, "industry": industry, "error": "查無新聞"}
+    return {
+        "news": news_items[:limit],
+        "summary": summary,
+        "sector": sector,
+        "industry": industry,
+        "error": None,
+    }
+
+
+# ──────────────────────────────────────────
+# 板塊概況（5 分鐘快取）
+# ──────────────────────────────────────────
+
+_sector_cache: dict = {"ts": 0.0, "data": None}
+SECTOR_CACHE_TTL = 300  # seconds
+
+
+def get_sector_overview() -> dict:
+    """
+    按板塊統計近1日、近5日平均漲跌幅。
+    結果快取 5 分鐘，避免重複呼叫。
+    """
+    global _sector_cache
+    now = time.time()
+    if _sector_cache["data"] and (now - _sector_cache["ts"]) < SECTOR_CACHE_TTL:
+        return _sector_cache["data"]
+
+    # 每個板塊的成分股
+    sector_tickers: dict[str, list[str]] = {}
+    for t, (sec, _ind) in TW_STOCK_SECTORS.items():
+        if t in SCREENER_TICKERS:
+            sector_tickers.setdefault(sec, []).append(t)
+
+    def fetch_return(t: str) -> dict:
+        try:
+            df = yf.Ticker(f"{t}.TW").history(period="7d", interval="1d", auto_adjust=True)
+            if df is not None and len(df) >= 2:
+                r1d = round((float(df["Close"].iloc[-1]) / float(df["Close"].iloc[-2]) - 1) * 100, 2)
+                r5d = round((float(df["Close"].iloc[-1]) / float(df["Close"].iloc[0])  - 1) * 100, 2) \
+                      if len(df) >= 5 else None
+                return {"ticker": t, "name": TW_STOCK_NAMES.get(t, ""), "r1d": r1d, "r5d": r5d}
+        except Exception:
+            pass
+        return {"ticker": t, "name": TW_STOCK_NAMES.get(t, ""), "r1d": None, "r5d": None}
+
+    all_tickers = [t for tl in sector_tickers.values() for t in tl]
+    returns_map: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futures = {ex.submit(fetch_return, t): t for t in all_tickers}
+        for f in as_completed(futures):
+            try:
+                r = f.result(timeout=15)
+                returns_map[r["ticker"]] = r
+            except Exception:
+                pass
+
+    sectors_out = []
+    for sec, tickers in sector_tickers.items():
+        ticker_stats = [returns_map.get(t, {"ticker": t, "name": TW_STOCK_NAMES.get(t, ""), "r1d": None, "r5d": None})
+                        for t in tickers]
+        r1_vals = [s["r1d"] for s in ticker_stats if s["r1d"] is not None]
+        r5_vals = [s["r5d"] for s in ticker_stats if s["r5d"] is not None]
+        sectors_out.append({
+            "sector": sec,
+            "avg_1d": round(sum(r1_vals) / len(r1_vals), 2) if r1_vals else None,
+            "avg_5d": round(sum(r5_vals) / len(r5_vals), 2) if r5_vals else None,
+            "tickers": ticker_stats,
+        })
+
+    sectors_out.sort(key=lambda x: x["avg_1d"] or 0, reverse=True)
+    result = {
+        "sectors": sectors_out,
+        "scanned_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "error": None,
+    }
+    _sector_cache = {"ts": now, "data": result}
+    return result
 
 
 def run_screener(min_score: int = 5) -> dict:

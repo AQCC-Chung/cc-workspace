@@ -58,5 +58,28 @@ export interface NewsItem {
 
 export interface NewsResponse {
   news: NewsItem[]
+  summary: string | null
+  sector: string | null
+  industry: string | null
+  error: string | null
+}
+
+export interface SectorTicker {
+  ticker: string
+  name: string
+  r1d: number | null
+  r5d: number | null
+}
+
+export interface SectorStat {
+  sector: string
+  avg_1d: number | null
+  avg_5d: number | null
+  tickers: SectorTicker[]
+}
+
+export interface SectorOverviewResponse {
+  sectors: SectorStat[]
+  scanned_at: string
   error: string | null
 }

@@ -838,6 +838,119 @@
   color: var(--text-muted);
 }
 
+/* ── Sector badge ────────────────────────── */
+.sm-sector-badge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  color: #a78bfa;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+}
+
+/* ── Gemini summary ──────────────────────── */
+.sm-news-summary {
+  background: rgba(52, 211, 153, 0.06);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem 1rem;
+}
+
+.sm-news-summary-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #34d399;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
+}
+
+.sm-news-summary-text {
+  font-family: inherit;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+/* ── Sector overview table ───────────────── */
+.sm-sector-overview {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.sm-sector-overview-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0.5rem 0.75rem;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sm-sector-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.sm-sector-table th {
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(255,255,255,0.02);
+}
+
+.sm-sector-table td {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  color: var(--text-secondary);
+}
+
+.sm-sector-table tr:last-child td { border-bottom: none; }
+
+.sector-name {
+  font-weight: 600;
+  color: var(--text-primary) !important;
+  white-space: nowrap;
+}
+
+.sector-tickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.sector-chip {
+  display: inline-block;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.sector-chip-up {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.sector-chip-down {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+}
+
 /* ── Responsive ──────────────────────────── */
 @media (max-width: 600px) {
   .sm-page { padding: 1.2rem 1rem 3rem; }

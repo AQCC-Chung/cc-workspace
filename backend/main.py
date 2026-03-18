@@ -88,6 +88,12 @@ def stock_news(
     return stock_monitor.get_stock_news(ticker, limit)
 
 
+@app.get("/api/stock/sector-overview")
+def stock_sector_overview():
+    """取得各板塊近期漲跌概況（5分鐘快取）。"""
+    return stock_monitor.get_sector_overview()
+
+
 @app.get("/health")
 def health_check():
     """Health check endpoint for Render."""

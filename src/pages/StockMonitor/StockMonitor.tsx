@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, ComposedChart, Bar, Cell,
 } from 'recharts'
-import type { WatchlistItem, TickerResult, ScanResponse, ChartPoint, NewsItem } from './types'
+import type { WatchlistItem, TickerResult, ScanResponse, ChartPoint, NewsItem, SectorStat } from './types'
 import './StockMonitor.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -247,13 +247,20 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
   const [customAnchorIdx, setCustomAnchorIdx] = useState<number | null>(null)
   const [zoomRange, setZoomRange] = useState<number | null>(null)
   const [newsItems, setNewsItems] = useState<NewsItem[]>([])
+  const [newsSummary, setNewsSummary] = useState<string | null>(null)
+  const [newsSector, setNewsSector] = useState<string>('')
+  const [newsIndustry, setNewsIndustry] = useState<string>('')
   const [newsLoading, setNewsLoading] = useState(false)
   const [newsError, setNewsError] = useState<string | null>(null)
   const [newsVisible, setNewsVisible] = useState(false)
+  const [sectorData, setSectorData] = useState<SectorStat[]>([])
+  const [sectorLoading, setSectorLoading] = useState(false)
+  const [sectorVisible, setSectorVisible] = useState(false)
 
   // Reset news when ticker changes
   useEffect(() => {
-    setNewsItems([]); setNewsError(null); setNewsVisible(false)
+    setNewsItems([]); setNewsSummary(null); setNewsSector(''); setNewsIndustry('')
+    setNewsError(null); setNewsVisible(false); setSectorData([]); setSectorVisible(false)
   }, [ticker])
 
   function fetchNews() {
@@ -262,10 +269,21 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then(d => {
         setNewsItems(d.news ?? [])
+        setNewsSummary(d.summary ?? null)
+        setNewsSector(d.sector ?? '')
+        setNewsIndustry(d.industry ?? '')
         if (d.error && (d.news ?? []).length === 0) setNewsError(d.error)
         setNewsLoading(false)
       })
       .catch(e => { setNewsError(e.message); setNewsLoading(false) })
+  }
+
+  function fetchSectorOverview() {
+    setSectorLoading(true); setSectorVisible(true)
+    fetch(`${API_BASE}/api/stock/sector-overview`)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      .then(d => { setSectorData(d.sectors ?? []); setSectorLoading(false) })
+      .catch(() => setSectorLoading(false))
   }
 
   // Reset on ticker/interval change
@@ -604,15 +622,81 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
         <div className="sm-news-section">
           <div className="sm-news-header">
             <span>相關新聞</span>
+            {(newsSector || newsIndustry) && (
+              <span className="sm-sector-badge">
+                {newsSector}{newsIndustry ? ` / ${newsIndustry}` : ''}
+              </span>
+            )}
             {newsItems.length > 0 && (
               <button className="sm-interval-btn" onClick={fetchNews} title="重新抓取新聞">重新整理</button>
             )}
+            <button
+              className={`sm-interval-btn${sectorVisible ? ' active' : ''}`}
+              onClick={() => {
+                if (sectorVisible) { setSectorVisible(false) }
+                else if (sectorData.length > 0) { setSectorVisible(true) }
+                else { fetchSectorOverview() }
+              }}
+              title="載入各板塊近期漲跌概況">
+              {sectorLoading ? '載入中…' : '板塊概況'}
+            </button>
           </div>
-          {newsLoading && <p className="sm-empty">查詢中…</p>}
+
+          {newsLoading && <p className="sm-empty">查詢中（含 AI 摘要，請稍候）…</p>}
           {newsError && <p className="sm-empty" style={{ color: '#f472b6' }}>⚠ {newsError}</p>}
           {!newsLoading && newsItems.length === 0 && !newsError && (
             <p className="sm-empty">查無相關新聞</p>
           )}
+
+          {/* Gemini AI 摘要 */}
+          {newsSummary && (
+            <div className="sm-news-summary">
+              <div className="sm-news-summary-label">✦ Gemini AI 摘要</div>
+              <pre className="sm-news-summary-text">{newsSummary}</pre>
+            </div>
+          )}
+
+          {/* 板塊概況表格 */}
+          {sectorVisible && sectorData.length > 0 && (
+            <div className="sm-sector-overview">
+              <div className="sm-sector-overview-title">板塊近期漲跌概況</div>
+              <table className="sm-sector-table">
+                <thead>
+                  <tr>
+                    <th>板塊</th>
+                    <th>日漲跌</th>
+                    <th>5日漲跌</th>
+                    <th>成分股</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sectorData.map(s => (
+                    <tr key={s.sector}
+                      className={s.avg_1d !== null ? s.avg_1d > 0 ? 'sector-up' : s.avg_1d < 0 ? 'sector-down' : '' : ''}>
+                      <td className="sector-name">{s.sector}</td>
+                      <td className={s.avg_1d !== null ? s.avg_1d > 0 ? 'td-positive' : s.avg_1d < 0 ? 'td-negative' : '' : ''}>
+                        {s.avg_1d !== null ? `${s.avg_1d > 0 ? '+' : ''}${s.avg_1d}%` : '—'}
+                      </td>
+                      <td className={s.avg_5d !== null ? s.avg_5d > 0 ? 'td-positive' : s.avg_5d < 0 ? 'td-negative' : '' : ''}>
+                        {s.avg_5d !== null ? `${s.avg_5d > 0 ? '+' : ''}${s.avg_5d}%` : '—'}
+                      </td>
+                      <td className="sector-tickers">
+                        {s.tickers.map(t => (
+                          <span key={t.ticker}
+                            className={`sector-chip ${t.r1d !== null ? t.r1d > 0 ? 'sector-chip-up' : t.r1d < 0 ? 'sector-chip-down' : '' : ''}`}
+                            title={`${t.name} 日漲跌 ${t.r1d !== null ? (t.r1d > 0 ? '+' : '') + t.r1d + '%' : '—'}`}>
+                            {t.ticker}
+                          </span>
+                        ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {sectorLoading && <p className="sm-empty" style={{ fontSize: '0.82rem' }}>載入板塊資料中（約10秒）…</p>}
+
           <ul className="sm-news-list">
             {newsItems.map((n, i) => (
               <li key={i} className="sm-news-item">
