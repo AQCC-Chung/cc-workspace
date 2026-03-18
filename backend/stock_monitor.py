@@ -515,12 +515,26 @@ def get_chart_data(ticker: str, interval: str) -> dict:
     except Exception:
         market_series = pd.Series(dtype=float)
 
-    # 對齊大盤時間戳
+    # 對齊大盤時間戳（正規化為字串 key 避免 tz-aware vs tz-naive 不吻合）
+    def _ts_key(ts) -> str:
+        try:
+            if ts.tzinfo is not None:
+                ts = ts.tz_convert("UTC").tz_localize(None)
+        except Exception:
+            pass
+        try:
+            return ts.strftime("%Y-%m-%d") if interval == "1d" else ts.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            s = str(ts)
+            return s[:10] if interval == "1d" else s[:16]
+
     market_map: dict = {}
     for ts, val in market_series.items():
-        market_map[ts] = float(val)
+        market_map[_ts_key(ts)] = float(val)
 
     points = []
+    import pytz
+    tw_tz = pytz.timezone("Asia/Taipei")
     for ts, row in df.iterrows():
         # 時間格式
         if hasattr(ts, "to_pydatetime"):
@@ -531,19 +545,17 @@ def get_chart_data(ticker: str, interval: str) -> dict:
         if interval == "1d":
             time_str = dt.strftime("%Y-%m-%d")
         else:
-            import pytz
             try:
-                tw = pytz.timezone("Asia/Taipei")
                 if dt.tzinfo is None:
-                    dt_tw = dt.replace(tzinfo=pytz.utc).astimezone(tw)
+                    dt_tw = dt.replace(tzinfo=pytz.utc).astimezone(tw_tz)
                 else:
-                    dt_tw = dt.astimezone(tw)
+                    dt_tw = dt.astimezone(tw_tz)
                 time_str = dt_tw.strftime("%m-%d %H:%M")
             except Exception:
                 time_str = dt.strftime("%m-%d %H:%M")
 
         close_val = float(row["Close"]) if not pd.isna(row["Close"]) else None
-        market_close = market_map.get(ts, None)
+        market_close = market_map.get(_ts_key(ts), None)
 
         points.append({
             "time": time_str,

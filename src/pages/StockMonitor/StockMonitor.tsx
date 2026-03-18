@@ -398,7 +398,18 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
                 style={{ cursor: anchorMode ? 'crosshair' : 'default' }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="time" stroke="#444" tick={{ fill: '#888', fontSize: 11 }} minTickGap={40} />
-                <YAxis domain={['auto', 'auto']} stroke="#444" tick={{ fill: '#888', fontSize: 11 }} width={56} />
+                <YAxis
+                  domain={[
+                    (dataMin: number) => {
+                      const mn = entryPrice && entryPrice > 0 ? Math.min(dataMin, entryPrice) : dataMin
+                      return +(mn * 0.995).toFixed(2)
+                    },
+                    (dataMax: number) => {
+                      const mx = entryPrice && entryPrice > 0 ? Math.max(dataMax, entryPrice) : dataMax
+                      return +(mx * 1.005).toFixed(2)
+                    },
+                  ]}
+                  stroke="#444" tick={{ fill: '#888', fontSize: 11 }} width={56} />
                 <Tooltip contentStyle={{ background: '#14141e', border: '1px solid #333', fontSize: 12 }}
                   itemStyle={{ color: '#ccc' }} labelStyle={{ color: '#888' }} />
                 {latest?.poc > 0 && (
