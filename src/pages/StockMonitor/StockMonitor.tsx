@@ -206,10 +206,16 @@ const MAX_CANDLES = 300
 interface ChartPanelProps {
   ticker: string
   entryPrice?: number
+  signal?: string
+  score?: number | null
   onClose: () => void
 }
 
-function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
+function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelProps) {
+  const sectionRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [ticker])
   const [interval, setInterval] = useState<Interval>('1d')
   const [rawData, setRawData] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(false)
@@ -333,9 +339,21 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
   }
 
   return (
-    <section className="sm-section sm-chart-section">
+    <section ref={sectionRef} className="sm-section sm-chart-section">
       <div className="sm-chart-header">
         <h2>{ticker} 圖表</h2>
+        {signal && (
+          <span className={`sm-signal ${SIGNAL_CLASS[signal] ?? 'signal-neutral'}`}
+            style={{ fontSize: '0.82rem' }}>
+            {SIGNAL_ICON[signal]}{signal}
+          </span>
+        )}
+        {score !== null && score !== undefined && (
+          <span className={`sm-score-badge ${score >= 5 ? 'score-bull' : score <= -3 ? 'score-bear' : 'score-neutral'}`}
+            style={{ fontSize: '0.8rem' }}>
+            {score > 0 ? '+' : ''}{score}分
+          </span>
+        )}
         <div className="sm-interval-group">
           {INTERVALS.map(iv => (
             <button key={iv.value}
@@ -798,6 +816,16 @@ export default function StockMonitor() {
       {chartTicker && (
         <ChartPanel ticker={chartTicker}
           entryPrice={getWatchItem(chartTicker)?.entryPrice}
+          signal={
+            scanData?.results.find(r => r.ticker === chartTicker)?.signal ??
+            screenerData?.results.find(r => r.ticker === chartTicker)?.signal ??
+            undefined
+          }
+          score={
+            scanData?.results.find(r => r.ticker === chartTicker)?.score ??
+            screenerData?.results.find(r => r.ticker === chartTicker)?.score ??
+            undefined
+          }
           onClose={() => setChartTicker(null)} />
       )}
 
