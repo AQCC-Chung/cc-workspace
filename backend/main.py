@@ -71,6 +71,14 @@ def stock_chart(
     return stock_monitor.get_chart_data(ticker, interval)
 
 
+@app.get("/api/stock/screener")
+def stock_screener(
+    min_score: int = Query(5, ge=0, le=10, description="最低得分門檻"),
+):
+    """掃描預設清單，回傳符合得分條件的標的。"""
+    return stock_monitor.run_screener(min_score)
+
+
 @app.get("/health")
 def health_check():
     """Health check endpoint for Render."""

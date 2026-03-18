@@ -688,6 +688,80 @@
   margin-bottom: 0.25rem;
 }
 
+/* ── Screener button ─────────────────────── */
+.sm-btn-screener {
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  padding: 0.55rem 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.sm-btn-screener:hover { opacity: 0.85; }
+.sm-btn-screener:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.sm-btn-xs {
+  font-size: 0.72rem !important;
+  padding: 0.2rem 0.55rem !important;
+}
+
+/* ── Screener section ────────────────────── */
+.sm-screener-section { }
+
+.sm-screener-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+/* ── Zoom controls ───────────────────────── */
+.sm-zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.sm-zoom-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: center;
+}
+
+/* ── Indicator docs ──────────────────────── */
+.sm-indicator-docs h3 {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.sm-docs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+.sm-doc-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+}
+
+.sm-doc-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-gold);
+  margin-bottom: 0.4rem;
+}
+
+.sm-doc-card p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
 /* ── Responsive ──────────────────────────── */
 @media (max-width: 600px) {
   .sm-page { padding: 1.2rem 1rem 3rem; }

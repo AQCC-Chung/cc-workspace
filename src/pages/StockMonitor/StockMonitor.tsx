@@ -44,6 +44,12 @@ interface ScanHistory {
 
 type SortKey = 'score' | 'rsi' | 'zscore' | 'td_count' | 'rr_ratio' | 'pnl' | null
 
+interface ScreenerResponse {
+  results: TickerResult[]
+  total_scanned: number
+  scanned_at: string
+}
+
 // ── 持久化 ──────────────────────────────────────────
 function loadWatchlist(): WatchlistItem[] {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') }
@@ -211,9 +217,12 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
   const [showBB, setShowBB] = useState(true)
   const [anchorMode, setAnchorMode] = useState(false)
   const [customAnchorIdx, setCustomAnchorIdx] = useState<number | null>(null)
+  const [zoomRange, setZoomRange] = useState<number | null>(null)
 
-  // Reset anchor when ticker/interval changes
-  useEffect(() => { setCustomAnchorIdx(null); setAnchorMode(false) }, [ticker, interval])
+  // Reset on ticker/interval change
+  useEffect(() => {
+    setCustomAnchorIdx(null); setAnchorMode(false); setZoomRange(null)
+  }, [ticker, interval])
 
   useEffect(() => {
     let cancelled = false
@@ -292,9 +301,19 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
   }, [rawData, customAnchorIdx])
 
   const displayData = useMemo(() => {
-    if (processed.length <= MAX_CANDLES) return processed
-    return processed.slice(processed.length - MAX_CANDLES)
-  }, [processed])
+    const base = Math.min(processed.length, MAX_CANDLES)
+    const range = zoomRange !== null ? Math.min(zoomRange, processed.length) : base
+    return processed.slice(Math.max(0, processed.length - range))
+  }, [processed, zoomRange])
+
+  function zoomIn() {
+    setZoomRange(prev => Math.max(20, Math.floor((prev ?? Math.min(processed.length, MAX_CANDLES)) * 0.6)))
+  }
+  function zoomOut() {
+    const current = zoomRange ?? Math.min(processed.length, MAX_CANDLES)
+    const next = Math.ceil(current / 0.6)
+    setZoomRange(next >= processed.length ? null : next)
+  }
 
   const INTERVALS: { value: Interval; label: string }[] = [
     { value: '1d', label: '日K' },
@@ -334,6 +353,11 @@ function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
           <button className="sm-interval-btn" onClick={() => setCustomAnchorIdx(null)}
             title="重置為 60 日最低點">重置錨點</button>
         )}
+        <div className="sm-zoom-group">
+          <button className="sm-interval-btn" onClick={zoomIn} title="放大（顯示更少K棒）">＋</button>
+          <span className="sm-zoom-label">{displayData.length}根</span>
+          <button className="sm-interval-btn" onClick={zoomOut} title="縮小（顯示更多K棒）">－</button>
+        </div>
         <button className="sm-btn sm-btn-ghost sm-chart-close" onClick={onClose}>✕ 關閉</button>
       </div>
       {anchorMode && (
@@ -508,6 +532,12 @@ export default function StockMonitor() {
   const [scanHistory, setScanHistory] = useState<ScanHistory[]>(loadHistory)
   const [showHistory, setShowHistory] = useState(false)
 
+  // Screener
+  const [screenerData, setScreenerData] = useState<ScreenerResponse | null>(null)
+  const [screenerLoading, setScreenerLoading] = useState(false)
+  const [screenerError, setScreenerError] = useState<string | null>(null)
+  const [showScreener, setShowScreener] = useState(false)
+
   // Import ref
   const importRef = useRef<HTMLInputElement>(null)
 
@@ -609,6 +639,19 @@ export default function StockMonitor() {
     reader.readAsText(file)
   }
 
+  async function handleScreener() {
+    setScreenerLoading(true); setScreenerError(null); setShowScreener(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/stock/screener?min_score=5`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setScreenerData(await res.json())
+    } catch (e) {
+      setScreenerError(`尋股失敗：${e instanceof Error ? e.message : e}`)
+    } finally {
+      setScreenerLoading(false)
+    }
+  }
+
   // Processed results (with pnl)
   const processedResults = useMemo(() => {
     if (!scanData) return []
@@ -666,6 +709,10 @@ export default function StockMonitor() {
           </div>
         </div>
         <div className="sm-header-right">
+          <button className="sm-btn sm-btn-screener" onClick={handleScreener}
+            disabled={screenerLoading} title="自動搜索台股中得分≥5的標的">
+            {screenerLoading ? '🔍 搜尋中…' : '🔍 一鍵尋股'}
+          </button>
           <button className="sm-btn sm-btn-scan" onClick={handleScan}
             disabled={loading || watchlist.length === 0}>
             {loading ? '⏳ 掃描中…' : '▶ 執行掃描'}
@@ -698,7 +745,7 @@ export default function StockMonitor() {
           <span className="sm-banner-note">— 各標的訊號仍正常顯示，請自行評估風險</span>
         </div>
       )}
-      {scanData && !scanData.systemic_risk && (
+      {scanData && !scanData.systemic_risk && scanData.systemic_msg && (
         <div className="sm-banner-ok">
           ✓ {scanData.systemic_msg}
           <span className="sm-scan-time">掃描時間：{scanData.scanned_at.replace('T', ' ')}</span>
@@ -882,6 +929,72 @@ export default function StockMonitor() {
         </section>
       )}
 
+      {/* 一鍵尋股結果 */}
+      {showScreener && (
+        <section className="sm-section sm-screener-section">
+          <div className="sm-section-head">
+            <h2>一鍵尋股結果
+              {screenerData && <span className="sm-count">{screenerData.results.length}/{screenerData.total_scanned}</span>}
+            </h2>
+            <button className="sm-btn sm-btn-ghost sm-btn-sm" onClick={() => setShowScreener(false)}>✕ 關閉</button>
+          </div>
+          {screenerLoading && <p className="sm-empty">正在掃描 {screenerData?.total_scanned ?? 50} 檔標的，約需 20-30 秒…</p>}
+          {screenerError && <p className="sm-empty" style={{ color: '#f472b6' }}>{screenerError}</p>}
+          {screenerData && !screenerLoading && (
+            screenerData.results.length === 0
+              ? <p className="sm-empty">目前無符合條件（得分≥5）的標的</p>
+              : <>
+                <p className="sm-screener-note">掃描時間：{screenerData.scanned_at.replace('T', ' ')}　點擊代號可加入持倉清單</p>
+                <div className="sm-table-wrap">
+                  <table className="sm-table">
+                    <thead>
+                      <tr>
+                        <th>代號</th><th>收盤</th><th>RSI</th><th>Z-Score</th>
+                        <th>RR比</th><th>得分</th><th>判定</th><th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {screenerData.results.map(r => (
+                        <tr key={r.ticker} style={{ cursor: 'pointer' }} onClick={() => openChart(r.ticker)}>
+                          <td className="td-ticker">{r.ticker}</td>
+                          <td>{r.close ?? '—'}</td>
+                          <td className={r.rsi !== null ? r.rsi < 30 ? 'td-positive' : r.rsi > 70 ? 'td-negative' : '' : ''}>
+                            {r.rsi !== null ? r.rsi.toFixed(1) : '—'}
+                          </td>
+                          <td className={r.zscore !== null ? r.zscore < -1.5 ? 'td-positive' : '' : ''}>
+                            {r.zscore !== null ? r.zscore.toFixed(2) : '—'}
+                          </td>
+                          <td className={r.rr_ratio !== null && r.rr_ratio >= 2.5 ? 'td-positive' : 'td-muted'}>
+                            {r.rr_ratio !== null ? r.rr_ratio.toFixed(1) : '—'}
+                          </td>
+                          <td>
+                            <span className={`sm-score-badge ${(r.score ?? 0) >= 5 ? 'score-bull' : 'score-neutral'}`}>
+                              {(r.score ?? 0) > 0 ? '+' : ''}{r.score}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`sm-signal ${SIGNAL_CLASS[r.signal ?? ''] ?? 'signal-neutral'}`}>
+                              {SIGNAL_ICON[r.signal ?? '']}{r.signal}
+                            </span>
+                          </td>
+                          <td>
+                            {!getWatchItem(r.ticker) && (
+                              <button className="sm-btn sm-btn-add sm-btn-xs"
+                                onClick={e => { e.stopPropagation(); handleSave({ ticker: r.ticker, entryPrice: 0, shares: 0 }) }}>
+                                + 加入
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+          )}
+        </section>
+      )}
+
       {/* 訊號說明 */}
       <section className="sm-section sm-legend">
         <h3>訊號說明</h3>
@@ -898,6 +1011,61 @@ export default function StockMonitor() {
           <li><span className="sm-signal signal-risk">系統性風險</span> S&amp;P500 單日跌幅≥2%，暫停買入</li>
         </ul>
         <p className="sm-legend-note">停損參考 = 收盤 - 2×ATR(14)　RR比 = (20日高點 - 收盤) / (2×ATR)　損益已扣雙邊手續費 0.1425%×2 及證交稅 0.3%</p>
+      </section>
+
+      {/* 指標說明 */}
+      <section className="sm-section sm-indicator-docs">
+        <h3>各項指標說明</h3>
+        <div className="sm-docs-grid">
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">得分系統</div>
+            <p>多指標加總分數。Z-Score/TD 各貢獻 ±2~3 分，RSI/EMA/MACD/投信/AVWAP/RR 各貢獻 ±1~2 分。≥8 滿分買進，5~7 強烈買進，≤-5 強烈賣出，-2~2 觀察中。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">Z-Score（均值回歸）</div>
+            <p>個股收盤相對20日均線的標準差偏離量。Z&lt;-1.5 代表超跌（買入機會），Z&gt;2.0 代表超漲（賣出警示）。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">TD Sequential（九轉）</div>
+            <p>連續9根K棒遞增（TD+9）或遞減（TD-9）時，代表多空動能耗盡。接近±9時配合RSI與RR判斷進出時機。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">RSI（相對強弱指數）</div>
+            <p>14日動能指標。RSI&lt;30 超賣（潛在買點），RSI&gt;70 超買（潛在賣點）。搭配趨勢使用，避免在下跌趨勢中過早買入。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">MACD（動能指標）</div>
+            <p>EMA12 - EMA26 = MACD線；EMA9(MACD) = 訊號線；兩線之差 = Histogram。Histogram由負轉正且MACD線在零軸上方 = 「空中加油」，是強烈買入訊號。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">EMA 8 / 21 / 55</div>
+            <p>短中長期指數移動平均線。EMA8上穿EMA21（黃金交叉）且站上EMA55為波段起漲訊號；反之死亡交叉為轉弱訊號。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">AVWAP（錨定成交量加權均價）</div>
+            <p>從60日最低點起算的累積成交量均價，代表持有成本中樞。股價近AVWAP（≤2%）且反彈，為支撐確認買點。自訂錨點可從任意K棒重算。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">ATR（真實波幅）</div>
+            <p>14日平均真實波幅，衡量波動大小。停損設於 收盤 - 2×ATR，讓噪音不觸發停損。ATR也用於計算RR比。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">RR比（風險報酬比）</div>
+            <p>= (20日最高點 - 現價) / (2×ATR)。代表潛在獲利空間 vs 停損風險的比值。RR≥2.5 代表每承擔1元風險有2.5元潛在獲利，為優質進場條件。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">投信淨買（籌碼面）</div>
+            <p>投信當日買入 - 賣出張數。連續買超代表法人信心，配合技術面買進訊號可提高勝率。淨買&gt;0 加分，淨賣扣分。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">BB 布林通道</div>
+            <p>20日均線 ± 2倍標準差。股價碰觸下軌（超跌）或上軌（超漲）時提示波動極端狀態。帶寬收窄代表醞釀突破行情。</p>
+          </div>
+          <div className="sm-doc-card">
+            <div className="sm-doc-title">RS Line（相對強弱線）</div>
+            <p>個股收盤 ÷ 大盤（^TWII）收盤，追蹤相對大盤的強弱。RS線上升代表個股跑贏大盤，為選股加分條件；下降則代表相對弱勢。</p>
+          </div>
+        </div>
       </section>
 
       {/* Modal */}

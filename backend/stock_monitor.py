@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import time
 import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
@@ -38,15 +39,15 @@ def check_systemic_risk() -> dict:
     try:
         df = yf.download("^GSPC", period="5d", auto_adjust=True, progress=False)
         if df is None or len(df) < 2:
-            return {"flag": False, "msg": "無法取得 S&P 500 資料"}
+            return {"flag": False, "msg": ""}
         df = _flatten_columns(df)
         closes = df["Close"].dropna()
         pct = float((closes.iloc[-1] - closes.iloc[-2]) / closes.iloc[-2])
         if pct <= -0.02:
             return {"flag": True, "msg": f"系統性風險：暫停買入（S&P500 {pct*100:.2f}%）"}
         return {"flag": False, "msg": f"系統正常（S&P500 {pct*100:+.2f}%）"}
-    except Exception as e:
-        return {"flag": False, "msg": f"風險檢查失敗：{e}"}
+    except Exception:
+        return {"flag": False, "msg": ""}
 
 
 def _check_liquidity(df: pd.DataFrame) -> tuple[bool, str]:
@@ -538,3 +539,59 @@ def get_chart_data(ticker: str, interval: str) -> dict:
 
     points = [p for p in points if p["price"] is not None]
     return {"data": points, "error": None}
+
+
+# ──────────────────────────────────────────
+# 一鍵尋股（Screener）
+# ──────────────────────────────────────────
+
+SCREENER_TICKERS = [
+    # ETF
+    "0050", "0056",
+    # 半導體
+    "2330", "2454", "3711", "3034", "2344", "3008", "6488", "2337", "6415",
+    # PC / 伺服器 / 零組件
+    "2317", "2382", "2357", "4938", "2376", "2377", "3231", "2353",
+    # 電子製造 / 被動元件
+    "2308", "2301", "2395", "2379", "6669", "2474", "3702",
+    # 網路 / 通訊
+    "2412", "3045", "4904",
+    # 金融
+    "2882", "2881", "2886", "2891", "2892", "2884", "2885", "5880",
+    # 石化 / 基材
+    "1301", "1303", "1326", "6505",
+    # 水泥 / 鋼鐵
+    "1101", "1102", "2002",
+    # 航運
+    "2603", "2609", "2615",
+    # 消費 / 零售
+    "2912", "2207", "1216",
+]
+
+
+def run_screener(min_score: int = 5) -> dict:
+    """
+    平行掃描 SCREENER_TICKERS，回傳得分 >= min_score 的標的（按得分排序）。
+    """
+    def scan_safe(t: str) -> dict:
+        try:
+            return scan_ticker(t)
+        except Exception as e:
+            return {"ticker": t, "error": str(e), "score": None, "signal": "錯誤"}
+
+    results = []
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {executor.submit(scan_safe, t): t for t in SCREENER_TICKERS}
+        for future in as_completed(futures):
+            try:
+                r = future.result(timeout=20)
+                if r.get("score") is not None and r["score"] >= min_score:
+                    results.append(r)
+            except Exception:
+                pass
+
+    return {
+        "results": sorted(results, key=lambda r: r.get("score") or 0, reverse=True),
+        "total_scanned": len(SCREENER_TICKERS),
+        "scanned_at": datetime.datetime.now().isoformat(timespec="seconds"),
+    }
