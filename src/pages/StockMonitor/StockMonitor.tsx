@@ -304,8 +304,8 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
 
     return rawData.map((d, i) => ({
       ...d,
-      ema8: +ema8[i].toFixed(2),
-      ema21: +ema21[i].toFixed(2),
+      ema8: i >= 7 ? +ema8[i].toFixed(2) : null,
+      ema21: i >= 20 ? +ema21[i].toFixed(2) : null,
       ema55: i >= 54 ? +ema55[i].toFixed(2) : null,
       macdHist: +macdHist[i].toFixed(3),
       macdLine: +macdLine[i].toFixed(3),
@@ -740,7 +740,7 @@ export default function StockMonitor() {
     })
   }, [processedResults, sortKey, sortDir])
 
-  // Portfolio summary
+  // Portfolio summary（損益扣除同行情損益一致的手續費+稅 0.585%）
   const portfolio = useMemo(() => {
     if (processedResults.length === 0) return null
     let totalCost = 0, totalValue = 0, count = 0
@@ -751,7 +751,9 @@ export default function StockMonitor() {
       count++
     })
     if (count === 0) return null
-    const pnl = totalValue - totalCost
+    // 與 pnlPct() 一致：扣除賣出稅(0.3%) + 買入手續費(0.1425%) + 賣出手續費(0.1425%)
+    const ROUND_TRIP_COST = 0.003 + 0.001425 * 2  // 0.00585
+    const pnl = totalValue - totalCost - totalCost * ROUND_TRIP_COST
     const pct = totalCost > 0 ? pnl / totalCost * 100 : 0
     return { totalValue, totalCost, pnl, pct }
   }, [processedResults])

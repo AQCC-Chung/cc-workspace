@@ -364,7 +364,7 @@ def _calc_score_and_signal(
             return score, "九轉賣點"
         if death_cross:
             return score, "波段轉弱"
-        return score, "強烈賣出"
+        return score, "觀察中"   # score -3/-4 無特定訊號 → 輕度偏空，不觸發強烈賣出
 
     return score, "觀察中"
 
