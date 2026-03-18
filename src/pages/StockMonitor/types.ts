@@ -58,7 +58,6 @@ export interface NewsItem {
 
 export interface NewsResponse {
   news: NewsItem[]
-  summary: string | null
   sector: string | null
   industry: string | null
   error: string | null

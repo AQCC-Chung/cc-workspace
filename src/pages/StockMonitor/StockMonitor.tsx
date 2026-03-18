@@ -4,6 +4,7 @@ import {
   ResponsiveContainer, ReferenceLine, ComposedChart, Bar, Cell,
 } from 'recharts'
 import type { WatchlistItem, TickerResult, ScanResponse, ChartPoint, NewsItem, SectorStat } from './types'
+import { geminiGenerate } from '../../utils/gemini'
 import './StockMonitor.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -251,6 +252,7 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
   const [newsSector, setNewsSector] = useState<string>('')
   const [newsIndustry, setNewsIndustry] = useState<string>('')
   const [newsLoading, setNewsLoading] = useState(false)
+  const [summaryLoading, setSummaryLoading] = useState(false)
   const [newsError, setNewsError] = useState<string | null>(null)
   const [newsVisible, setNewsVisible] = useState(false)
   const [sectorData, setSectorData] = useState<SectorStat[]>([])
@@ -263,19 +265,47 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
     setNewsError(null); setNewsVisible(false); setSectorData([]); setSectorVisible(false)
   }, [ticker])
 
-  function fetchNews() {
+  async function fetchNews() {
     setNewsLoading(true); setNewsError(null); setNewsVisible(true)
-    fetch(`${API_BASE}/api/stock/news/${ticker}`)
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then(d => {
-        setNewsItems(d.news ?? [])
-        setNewsSummary(d.summary ?? null)
-        setNewsSector(d.sector ?? '')
-        setNewsIndustry(d.industry ?? '')
-        if (d.error && (d.news ?? []).length === 0) setNewsError(d.error)
-        setNewsLoading(false)
-      })
-      .catch(e => { setNewsError(e.message); setNewsLoading(false) })
+    setNewsSummary(null); setSummaryLoading(false)
+    try {
+      const r = await fetch(`${API_BASE}/api/stock/news/${ticker}`)
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const d = await r.json()
+      const items: NewsItem[] = d.news ?? []
+      setNewsItems(items)
+      setNewsSector(d.sector ?? '')
+      setNewsIndustry(d.industry ?? '')
+      if (d.error && items.length === 0) setNewsError(d.error)
+      setNewsLoading(false)
+
+      // Gemini summary — called client-side using the existing free/paid key utility
+      if (items.length > 0) {
+        setSummaryLoading(true)
+        const name = d.sector
+          ? `${ticker}（${d.sector}/${d.industry}）`
+          : ticker
+        const newsText = items.slice(0, 6)
+          .map(n => `・${n.title} (${n.publisher ?? ''} ${n.time_str})`)
+          .join('\n')
+        const prompt =
+          `你是台灣股市分析師。以下是 ${name} 的最新相關新聞：\n\n${newsText}\n\n` +
+          '請用繁體中文回覆：\n' +
+          '【重點摘要】條列3-5個核心要點（每點一行，以・開頭）\n' +
+          '【消息面判斷】偏多/中性/偏空 — 一句話說明整體市場反應方向'
+        try {
+          const resp = await geminiGenerate({ model: 'gemini-2.5-flash', contents: prompt })
+          setNewsSummary(resp.text ?? null)
+        } catch {
+          setNewsSummary(null)
+        } finally {
+          setSummaryLoading(false)
+        }
+      }
+    } catch (e: any) {
+      setNewsError(e.message)
+      setNewsLoading(false)
+    }
   }
 
   function fetchSectorOverview() {
@@ -642,16 +672,22 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
             </button>
           </div>
 
-          {newsLoading && <p className="sm-empty">查詢中（含 AI 摘要，請稍候）…</p>}
+          {newsLoading && <p className="sm-empty">查詢新聞中…</p>}
           {newsError && <p className="sm-empty" style={{ color: '#f472b6' }}>⚠ {newsError}</p>}
           {!newsLoading && newsItems.length === 0 && !newsError && (
             <p className="sm-empty">查無相關新聞</p>
           )}
 
           {/* Gemini AI 摘要 */}
-          {newsSummary && (
+          {summaryLoading && (
             <div className="sm-news-summary">
               <div className="sm-news-summary-label">✦ Gemini AI 摘要</div>
+              <p className="sm-news-summary-text" style={{ opacity: 0.5 }}>Gemini 分析中…</p>
+            </div>
+          )}
+          {!summaryLoading && newsSummary && (
+            <div className="sm-news-summary">
+              <div className="sm-news-summary-label">✦ Gemini AI 摘要（gemini-2.5-flash）</div>
               <pre className="sm-news-summary-text">{newsSummary}</pre>
             </div>
           )}

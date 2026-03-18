@@ -16,7 +16,6 @@ import yfinance as yf
 
 FINMIND_TOKEN = os.environ.get("FINMIND_TOKEN", "")
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 TAX = 0.003
 FEE = 0.001425
 
@@ -109,24 +108,6 @@ def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     return df
-
-
-def _call_gemini(prompt: str) -> str | None:
-    """呼叫 Gemini REST API 產生摘要；未設定 GEMINI_API_KEY 時回傳 None。"""
-    if not GEMINI_API_KEY:
-        return None
-    url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-           "gemini-2.0-flash:generateContent")
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 512, "temperature": 0.25},
-    }
-    try:
-        r = requests.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=20)
-        r.raise_for_status()
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception:
-        return None
 
 
 # ──────────────────────────────────────────
@@ -795,29 +776,10 @@ def get_stock_news(ticker: str, limit: int = 8) -> dict:
     sector_tuple = TW_STOCK_SECTORS.get(ticker, ("", ""))
     sector, industry = sector_tuple
 
-    # ── Gemini AI 摘要（平行跑，不阻塞新聞回傳）──
-    summary: str | None = None
-    if news_items and GEMINI_API_KEY:
-        name    = TW_STOCK_NAMES.get(ticker, ticker)
-        sector_tag = f"【{sector}/{industry}】" if sector else ""
-        news_text = "\n".join(
-            f"・{n['title']} ({n['publisher'] or ''} {n['time_str']})"
-            for n in news_items[:6]
-        )
-        prompt = (
-            f"你是台灣股市分析師。以下是 {ticker}（{name}）{sector_tag} 的最新相關新聞：\n\n"
-            f"{news_text}\n\n"
-            "請用繁體中文回覆：\n"
-            "【重點摘要】條列3-5個核心要點（每點一行，以・開頭）\n"
-            "【消息面判斷】偏多/中性/偏空 — 一句話說明整體市場反應方向"
-        )
-        summary = _call_gemini(prompt)
-
     if not news_items:
-        return {"news": [], "summary": None, "sector": sector, "industry": industry, "error": "查無新聞"}
+        return {"news": [], "sector": sector, "industry": industry, "error": "查無新聞"}
     return {
         "news": news_items[:limit],
-        "summary": summary,
         "sector": sector,
         "industry": industry,
         "error": None,
