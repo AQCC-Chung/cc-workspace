@@ -628,6 +628,99 @@ SCREENER_TICKERS = [
 ]
 
 
+# ──────────────────────────────────────────
+# 新聞查詢
+# ──────────────────────────────────────────
+
+def get_stock_news(ticker: str, limit: int = 8) -> dict:
+    """
+    查詢個股相關新聞。
+    優先使用 yfinance .news；若不足，補充 Google News RSS。
+    回傳 {"news": [{title, link, publisher, time_str}], "error": null}
+    """
+    import xml.etree.ElementTree as ET
+
+    news_items: list[dict] = []
+
+    # ── 來源 1：yfinance news ──────────────────
+    try:
+        t = yf.Ticker(f"{ticker}.TW")
+        raw = t.news or []
+        for item in raw[:limit]:
+            # yfinance 0.2.x 結構：item["content"]["title"] / item["content"]["canonicalUrl"]["url"]
+            # 或舊版：item["title"] / item["link"]
+            content = item.get("content") or {}
+            title     = content.get("title") or item.get("title", "")
+            link_obj  = content.get("canonicalUrl") or {}
+            link      = link_obj.get("url") if isinstance(link_obj, dict) else None
+            link      = link or item.get("link", "") or item.get("url", "")
+            publisher = content.get("provider", {}).get("displayName") if isinstance(content.get("provider"), dict) else None
+            publisher = publisher or item.get("publisher", "")
+            pub_ts    = content.get("pubDate") or item.get("providerPublishTime")
+            if pub_ts:
+                try:
+                    if isinstance(pub_ts, (int, float)):
+                        pub_ts_dt = datetime.datetime.fromtimestamp(int(pub_ts))
+                    else:
+                        pub_ts_dt = datetime.datetime.fromisoformat(str(pub_ts).replace("Z", "+00:00"))
+                    time_str = pub_ts_dt.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    time_str = str(pub_ts)[:16]
+            else:
+                time_str = ""
+            if title and link:
+                news_items.append({
+                    "title": title,
+                    "link": link,
+                    "publisher": publisher,
+                    "time_str": time_str,
+                    "source": "yfinance",
+                })
+    except Exception:
+        pass
+
+    # ── 來源 2：Google News RSS（補充至 limit 筆）──
+    if len(news_items) < limit:
+        name = TW_STOCK_NAMES.get(ticker, "")
+        query = f"{ticker} {name}".strip() if name else ticker
+        rss_url = f"https://news.google.com/rss/search?q={requests.utils.quote(query)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        try:
+            resp = requests.get(rss_url, timeout=10,
+                                headers={"User-Agent": "Mozilla/5.0 (compatible)"})
+            resp.raise_for_status()
+            root = ET.fromstring(resp.content)
+            for item in root.iter("item"):
+                if len(news_items) >= limit:
+                    break
+                title   = (item.findtext("title") or "").strip()
+                link    = (item.findtext("link")  or "").strip()
+                pub_raw = item.findtext("pubDate") or ""
+                try:
+                    from email.utils import parsedate_to_datetime
+                    pub_dt   = parsedate_to_datetime(pub_raw)
+                    time_str = pub_dt.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    time_str = pub_raw[:16]
+                publisher = "Google 新聞"
+                # 略過重複
+                if any(n["title"] == title for n in news_items):
+                    continue
+                if title and link:
+                    news_items.append({
+                        "title": title,
+                        "link": link,
+                        "publisher": publisher,
+                        "time_str": time_str,
+                        "source": "google_news",
+                    })
+        except Exception:
+            pass
+
+    if not news_items:
+        return {"news": [], "error": "查無新聞"}
+    return {"news": news_items[:limit], "error": None}
+
+
 def run_screener(min_score: int = 5) -> dict:
     """
     平行掃描 SCREENER_TICKERS，回傳得分 >= min_score 的標的（按得分排序）。

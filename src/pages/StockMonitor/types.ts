@@ -47,3 +47,16 @@ export interface ChartResponse {
   name: string | null
   error: string | null
 }
+
+export interface NewsItem {
+  title: string
+  link: string
+  publisher: string | null
+  time_str: string
+  source: string
+}
+
+export interface NewsResponse {
+  news: NewsItem[]
+  error: string | null
+}

@@ -79,6 +79,15 @@ def stock_screener(
     return stock_monitor.run_screener(min_score)
 
 
+@app.get("/api/stock/news/{ticker}")
+def stock_news(
+    ticker: str,
+    limit: int = Query(8, ge=1, le=20, description="最多回傳幾則新聞"),
+):
+    """查詢個股相關新聞（yfinance + Google News RSS）。"""
+    return stock_monitor.get_stock_news(ticker, limit)
+
+
 @app.get("/health")
 def health_check():
     """Health check endpoint for Render."""

@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, ComposedChart, Bar, Cell,
 } from 'recharts'
-import type { WatchlistItem, TickerResult, ScanResponse, ChartPoint } from './types'
+import type { WatchlistItem, TickerResult, ScanResponse, ChartPoint, NewsItem } from './types'
 import './StockMonitor.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -246,6 +246,27 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
   const [anchorMode, setAnchorMode] = useState(false)
   const [customAnchorIdx, setCustomAnchorIdx] = useState<number | null>(null)
   const [zoomRange, setZoomRange] = useState<number | null>(null)
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([])
+  const [newsLoading, setNewsLoading] = useState(false)
+  const [newsError, setNewsError] = useState<string | null>(null)
+  const [newsVisible, setNewsVisible] = useState(false)
+
+  // Reset news when ticker changes
+  useEffect(() => {
+    setNewsItems([]); setNewsError(null); setNewsVisible(false)
+  }, [ticker])
+
+  function fetchNews() {
+    setNewsLoading(true); setNewsError(null); setNewsVisible(true)
+    fetch(`${API_BASE}/api/stock/news/${ticker}`)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      .then(d => {
+        setNewsItems(d.news ?? [])
+        if (d.error && (d.news ?? []).length === 0) setNewsError(d.error)
+        setNewsLoading(false)
+      })
+      .catch(e => { setNewsError(e.message); setNewsLoading(false) })
+  }
 
   // Reset on ticker/interval change
   useEffect(() => {
@@ -411,6 +432,16 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
           <span className="sm-zoom-label">{displayData.length}根</span>
           <button className="sm-interval-btn" onClick={zoomOut} title="縮小（顯示更多K棒）">－</button>
         </div>
+        <button
+          className={`sm-interval-btn${newsVisible ? ' active' : ''}`}
+          onClick={() => {
+            if (newsVisible) { setNewsVisible(false) }
+            else if (newsItems.length > 0) { setNewsVisible(true) }
+            else { fetchNews() }
+          }}
+          title="查詢相關新聞">
+          {newsLoading ? '載入中…' : '查詢新聞'}
+        </button>
         <button className="sm-btn sm-btn-ghost sm-chart-close" onClick={onClose}>✕ 關閉</button>
       </div>
       {anchorMode && (
@@ -566,6 +597,36 @@ function ChartPanel({ ticker, entryPrice, signal, score, onClose }: ChartPanelPr
             </ResponsiveContainer>
           </div>
         </>
+      )}
+
+      {/* 新聞區 */}
+      {newsVisible && (
+        <div className="sm-news-section">
+          <div className="sm-news-header">
+            <span>相關新聞</span>
+            {newsItems.length > 0 && (
+              <button className="sm-interval-btn" onClick={fetchNews} title="重新抓取新聞">重新整理</button>
+            )}
+          </div>
+          {newsLoading && <p className="sm-empty">查詢中…</p>}
+          {newsError && <p className="sm-empty" style={{ color: '#f472b6' }}>⚠ {newsError}</p>}
+          {!newsLoading && newsItems.length === 0 && !newsError && (
+            <p className="sm-empty">查無相關新聞</p>
+          )}
+          <ul className="sm-news-list">
+            {newsItems.map((n, i) => (
+              <li key={i} className="sm-news-item">
+                <a href={n.link} target="_blank" rel="noopener noreferrer" className="sm-news-title">
+                  {n.title}
+                </a>
+                <span className="sm-news-meta">
+                  {n.publisher && <span>{n.publisher}</span>}
+                  {n.time_str && <span>{n.time_str}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   )
@@ -881,7 +942,7 @@ export default function StockMonitor() {
 
       {/* K 線圖 */}
       {chartTicker && (
-        <ChartPanel ticker={chartTicker}
+        <ChartPanel key={chartTicker} ticker={chartTicker}
           entryPrice={getWatchItem(chartTicker)?.entryPrice}
           signal={
             scanData?.results.find(r => r.ticker === chartTicker)?.signal ??
