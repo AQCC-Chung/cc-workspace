@@ -116,12 +116,12 @@ def _calc_avwap(df: pd.DataFrame) -> float | None:
     anchor_label = low_series.idxmin()
     anchor_pos = df.index.get_loc(anchor_label)
 
-    seg_close = df["Close"].values[anchor_pos:]
+    seg_tp = ((df["High"].values + df["Low"].values + df["Close"].values) / 3)[anchor_pos:]
     seg_volume = df["Volume"].values[anchor_pos:]
     cum_vol = np.cumsum(seg_volume)
     if cum_vol[-1] == 0:
         return None
-    avwap = np.cumsum(seg_close * seg_volume) / cum_vol
+    avwap = np.cumsum(seg_tp * seg_volume) / cum_vol
     return round(float(avwap[-1]), 2)
 
 
@@ -447,10 +447,25 @@ def run_scan(tickers: list[str]) -> dict:
     回傳：{systemic_risk, systemic_msg, scanned_at, results[]}
     """
     systemic = check_systemic_risk()
-    results = []
-    for ticker in tickers:
-        row = scan_ticker(ticker)
-        results.append(row)
+    results_map: dict[str, dict] = {}
+
+    def scan_safe(t: str) -> dict:
+        try:
+            return scan_ticker(t)
+        except Exception as e:
+            return {"ticker": t, "error": str(e), "score": None, "signal": "錯誤"}
+
+    with ThreadPoolExecutor(max_workers=min(len(tickers), 6)) as executor:
+        futures = {executor.submit(scan_safe, t): t for t in tickers}
+        for future in as_completed(futures):
+            try:
+                r = future.result(timeout=30)
+                results_map[r["ticker"]] = r
+            except Exception:
+                pass
+
+    # 保持原始順序
+    results = [results_map.get(t, {"ticker": t, "error": "逾時", "score": None, "signal": "錯誤"}) for t in tickers]
 
     return {
         "systemic_risk": systemic["flag"],
