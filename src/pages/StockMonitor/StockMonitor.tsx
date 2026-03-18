@@ -150,10 +150,11 @@ type Interval = '1d' | '1h' | '1m'
 
 interface ChartPanelProps {
   ticker: string
+  entryPrice?: number
   onClose: () => void
 }
 
-function ChartPanel({ ticker, onClose }: ChartPanelProps) {
+function ChartPanel({ ticker, entryPrice, onClose }: ChartPanelProps) {
   const [interval, setInterval] = useState<Interval>('1d')
   const [rawData, setRawData] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(false)
@@ -285,6 +286,10 @@ function ChartPanel({ ticker, onClose }: ChartPanelProps) {
                   <ReferenceLine y={latest.poc} stroke="#8b5cf6" strokeDasharray="4 4"
                     label={{ value: 'POC', position: 'insideBottomRight', fill: '#8b5cf6', fontSize: 11 }} />
                 )}
+                {entryPrice && entryPrice > 0 && (
+                  <ReferenceLine y={entryPrice} stroke="#fb923c" strokeDasharray="6 3" strokeWidth={1.5}
+                    label={{ value: `成本 ${entryPrice}`, position: 'insideTopRight', fill: '#fb923c', fontSize: 11 }} />
+                )}
                 <Line type="monotone" dataKey="price" stroke="#e2a832" strokeWidth={2} dot={false} isAnimationActive={false} name="價格" />
                 <Line type="monotone" dataKey="ema8" stroke="#60a5fa" strokeWidth={1.5} dot={false} isAnimationActive={false} name="EMA8" />
                 <Line type="monotone" dataKey="ema21" stroke="#fbbf24" strokeWidth={1.5} dot={false} isAnimationActive={false} name="EMA21" />
@@ -302,6 +307,9 @@ function ChartPanel({ ticker, onClose }: ChartPanelProps) {
             <span style={{ color: '#a78bfa' }}>── EMA55</span>
             <span style={{ color: '#34d399' }}>╌╌ AVWAP</span>
             <span style={{ color: '#8b5cf6' }}>╌╌ POC</span>
+            {entryPrice && entryPrice > 0 && (
+              <span style={{ color: '#fb923c' }}>╌╌ 成本</span>
+            )}
           </div>
 
           {/* MACD 子圖 */}
@@ -479,7 +487,9 @@ export default function StockMonitor() {
 
       {/* K 線圖 */}
       {chartTicker && (
-        <ChartPanel ticker={chartTicker} onClose={() => setChartTicker(null)} />
+        <ChartPanel ticker={chartTicker}
+          entryPrice={getWatchItem(chartTicker)?.entryPrice}
+          onClose={() => setChartTicker(null)} />
       )}
 
       {/* Results Table */}
