@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Card from './Card';
 
 describe('Card Component', () => {
@@ -16,6 +16,10 @@ describe('Card Component', () => {
     };
 
     const mockOnClick = vi.fn();
+
+    beforeEach(() => {
+        mockOnClick.mockClear();
+    });
 
     it('renders card with correct data', () => {
         render(<Card data={mockData} onClick={mockOnClick} />);
@@ -53,7 +57,7 @@ describe('Card Component', () => {
         const influencerLink = screen.getByText(/Chef John/);
         fireEvent.click(influencerLink);
 
-        expect(windowSpy).toHaveBeenCalledWith('https://example.com/article', '_blank');
+        expect(windowSpy).toHaveBeenCalledWith('https://example.com/article', '_blank', 'noopener,noreferrer');
         expect(mockOnClick).not.toHaveBeenCalled();
 
         windowSpy.mockRestore();
