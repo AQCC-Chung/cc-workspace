@@ -272,6 +272,7 @@ export default function MeetNote() {
                                 className="history-item-delete"
                                 onClick={e => { e.stopPropagation(); deleteRecord(record.id); }}
                                 title="刪除"
+                                aria-label="刪除紀錄"
                             >
                                 ✕
                             </button>
@@ -318,6 +319,7 @@ export default function MeetNote() {
                                 <button
                                     className="file-info-remove"
                                     onClick={() => setFile(null)}
+                                    aria-label="移除檔案"
                                 >
                                     ✕
                                 </button>
@@ -391,12 +393,15 @@ export default function MeetNote() {
                             <button
                                 className="transcript-toggle"
                                 onClick={() => setTranscriptOpen(!transcriptOpen)}
+                                aria-expanded={transcriptOpen}
+                                aria-controls="transcript-content"
+                                aria-label={transcriptOpen ? '收合完整逐字稿' : '展開完整逐字稿'}
                             >
                                 <span>📜 完整逐字稿</span>
                                 <span>{transcriptOpen ? '收合 ▲' : '展開 ▼'}</span>
                             </button>
                             {transcriptOpen && (
-                                <div className="transcript-content">{currentRecord.transcript}</div>
+                                <div id="transcript-content" className="transcript-content">{currentRecord.transcript}</div>
                             )}
                         </div>
                     )}
