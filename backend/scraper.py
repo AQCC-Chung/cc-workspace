@@ -700,10 +700,14 @@ def scrape_data(keyword='台北 推薦 餐廳 網紅', limit=10, page=1):
 
     # Step 2: Extract place names from articles
     all_places = []
+    # ⚡ Bolt Optimization: Use a set for O(1) lookups instead of checking against a list O(N)
+    # to avoid an O(N^2) complexity bottleneck when scraping many places.
+    seen_places_names = set()
     for article in articles:
         extracted = extract_places_from_article(article['url'])
         for place in extracted:
-            if not any(p['name'] == place['name'] for p in all_places):
+            if place['name'] not in seen_places_names:
+                seen_places_names.add(place['name'])
                 all_places.append({
                     'name': place['name'],
                     'recommendation': place['recommendation'],

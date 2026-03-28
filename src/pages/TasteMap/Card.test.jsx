@@ -1,8 +1,12 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import Card from './Card';
 
 describe('Card Component', () => {
+    afterEach(() => {
+        mockOnClick.mockClear();
+    });
+
     const mockData = {
         name: 'Test Restaurant',
         image: 'test-image.jpg',
@@ -53,7 +57,7 @@ describe('Card Component', () => {
         const influencerLink = screen.getByText(/Chef John/);
         fireEvent.click(influencerLink);
 
-        expect(windowSpy).toHaveBeenCalledWith('https://example.com/article', '_blank');
+        expect(windowSpy).toHaveBeenCalledWith('https://example.com/article', '_blank', 'noopener,noreferrer');
         expect(mockOnClick).not.toHaveBeenCalled();
 
         windowSpy.mockRestore();
