@@ -52,6 +52,8 @@ const Timer: React.FC<Props> = ({ endTime, onClose }) => {
         <button 
           onClick={onClose}
           className="p-1 text-slate-500 hover:text-white"
+          aria-label="關閉計時器"
+          title="關閉計時器"
         >
           ✕
         </button>

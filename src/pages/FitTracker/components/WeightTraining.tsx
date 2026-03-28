@@ -510,6 +510,8 @@ ${historyText || '無歷史紀錄'}
                 </div>
                 <button onClick={handleCloseExercise}
                   className="w-10 h-10 bg-white/50 border border-white/40 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 transition-all shrink-0 ml-3"
+                  aria-label="關閉"
+                  title="關閉"
                 >✕</button>
               </div>
 
@@ -541,23 +543,23 @@ ${historyText || '無歷史紀錄'}
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">重量 ({unit})</label>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => setCurrentWeight(w => Math.max(0, w - 1))} className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
+                      <button onClick={() => setCurrentWeight(w => Math.max(0, w - 1))} aria-label="減少重量" className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
                       <input type="number" inputMode="decimal" value={currentWeight}
                         onChange={(e) => setCurrentWeight(parseFloat(e.target.value) || 0)}
                         className="flex-1 min-w-0 bg-white/50 py-3 rounded-2xl text-2xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 border border-white/40 text-center shadow-inner"
                       />
-                      <button onClick={() => setCurrentWeight(w => w + 1)} className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">+</button>
+                      <button onClick={() => setCurrentWeight(w => w + 1)} aria-label="增加重量" className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">+</button>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-center">次數</label>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => setCurrentReps(r => Math.max(1, r - 1))} className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
+                      <button onClick={() => setCurrentReps(r => Math.max(1, r - 1))} aria-label="減少次數" className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">−</button>
                       <input type="number" inputMode="numeric" value={currentReps}
                         onChange={(e) => setCurrentReps(parseInt(e.target.value) || 0)}
                         className="flex-1 min-w-0 bg-white/50 py-3 rounded-2xl text-2xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 border border-white/40 text-center shadow-inner"
                       />
-                      <button onClick={() => setCurrentReps(r => r + 1)} className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">+</button>
+                      <button onClick={() => setCurrentReps(r => r + 1)} aria-label="增加次數" className="w-8 h-12 bg-white/60 rounded-xl text-base font-black text-slate-500 border border-white/40 active:scale-90 transition-all flex items-center justify-center">+</button>
                     </div>
                   </div>
                 </div>
@@ -725,7 +727,7 @@ ${historyText || '無歷史紀錄'}
             <div className="bg-white w-full max-w-sm h-auto max-h-[80vh] flex flex-col rounded-[2.5rem] shadow-2xl p-6 sm:p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-6 px-1">
                 <h3 className="text-xl font-black text-slate-800 tracking-tight">編輯{CATEGORIES_CN[editingCategory]}器材</h3>
-                <button onClick={() => setEditingCategory(null)} className="p-2 -mr-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors">✕</button>
+                <button onClick={() => setEditingCategory(null)} className="p-2 -mr-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors" aria-label="關閉" title="關閉">✕</button>
               </div>
               <div className="overflow-y-auto pr-2 space-y-3 flex-1 no-scrollbar">
                 {exercises.filter(ex => ex.category === editingCategory).map(ex => (
