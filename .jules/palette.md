@@ -1,0 +1,3 @@
+## 2025-03-02 - Custom Number Input Accessibility
+**Learning:** In FitTracker's `WeightTraining.tsx`, replacing native number inputs with highly stylized, custom "+" and "-" increment/decrement buttons creates critical accessibility gaps if `aria-label`s are not provided. Screen readers read only the literal "+" and "-" symbols or texts, which provide no context (e.g., whether it increases "weight" or "reps").
+**Action:** Always ensure that custom controls mirroring native inputs are fully annotated with specific `aria-label`s describing not just the action (e.g. "增加", "減少") but also the subject (e.g. "重量", "次數").
