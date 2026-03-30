@@ -12,7 +12,7 @@ export default function DetailModal({ item, onClose }: DetailModalProps) {
     return (
         <div className="modal-backdrop" onClick={onClose}>
             <div className="modal-content" onClick={e => e.stopPropagation()}>
-                <button className="modal-close-btn" onClick={onClose}>×</button>
+                <button className="modal-close-btn" onClick={onClose} aria-label="關閉">×</button>
 
                 <div className="modal-image-container">
                     <img src={item.image} alt={item.name} className="modal-image" />
