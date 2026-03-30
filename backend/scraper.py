@@ -18,6 +18,13 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
 
+# ---------- Pre-compiled Regex Patterns for Performance ----------
+# Pre-compile these for use in extract_places_from_article
+_RE_NUMBERING = re.compile(r'^[\d#①②③④⑤⑥⑦⑧⑨⑩\.\)、\s：:]+')
+_RE_BRACKETS = re.compile(r'[【】\[\]「」『』《》〈〉]+')
+_RE_SUFFIX = re.compile(r'[\|｜\-–—]\s*.*$')
+_RE_SENTENCE_SPLIT = re.compile(r'[。！？!?\n]')
+
 # ---------- City config: lat/lng + valid address keywords ----------
 CITY_CONFIG = {
     # 台灣
@@ -381,10 +388,10 @@ def extract_places_from_article(url, max_names=5):
                 break
 
             raw_text = candidate['text']
-            # Clean up numbering
-            cleaned = re.sub(r'^[\d#①②③④⑤⑥⑦⑧⑨⑩\.\)、\s：:]+', '', raw_text).strip()
-            cleaned = re.sub(r'[【】\[\]「」『』《》〈〉]+', '', cleaned).strip()
-            cleaned = re.sub(r'[\|｜\-–—]\s*.*$', '', cleaned).strip()
+            # Clean up numbering (optimized with pre-compiled regex)
+            cleaned = _RE_NUMBERING.sub('', raw_text).strip()
+            cleaned = _RE_BRACKETS.sub('', cleaned).strip()
+            cleaned = _RE_SUFFIX.sub('', cleaned).strip()
 
             if not cleaned or len(cleaned) < 3 or len(cleaned) > 35:
                 continue
@@ -460,7 +467,8 @@ def extract_nearby_text(tag_obj, place_name):
 
     if sentences:
         full_text = ' '.join(sentences)
-        sentence_list = re.split(r'[。！？!?\n]', full_text)
+        # Optimized with pre-compiled regex
+        sentence_list = _RE_SENTENCE_SPLIT.split(full_text)
         for s in sentence_list:
             s = s.strip()
             if len(s) > 10 and len(s) < 120:
