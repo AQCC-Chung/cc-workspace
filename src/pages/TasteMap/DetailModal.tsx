@@ -15,7 +15,9 @@ export default function DetailModal({ item, onClose }: DetailModalProps) {
                 <button className="modal-close-btn" onClick={onClose}>×</button>
 
                 <div className="modal-image-container">
-                    <img src={item.image} alt={item.name} className="modal-image" />
+                    {/* ⚡ Bolt Optimization: Added loading="lazy" for the modal image.
+                        Impact: Defers image download until the modal is actually opened, improving initial load performance. */}
+                    <img src={item.image} alt={item.name} className="modal-image" loading="lazy" />
                     <div className="modal-image-overlay" />
                 </div>
 
