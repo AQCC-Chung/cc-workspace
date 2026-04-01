@@ -11,7 +11,8 @@ export default function Card({ data, onClick }: CardProps) {
     const handleSourceClick = (e: MouseEvent) => {
         e.stopPropagation();
         if (data.article_url) {
-            window.open(data.article_url, '_blank');
+            // 🛡️ Sentinel: Prevent reverse tabnabbing vulnerability
+            window.open(data.article_url, '_blank', 'noopener,noreferrer');
         }
     };
 
