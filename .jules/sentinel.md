@@ -1,0 +1,4 @@
+## 2024-05-18 - Prevent Reverse Tabnabbing in window.open
+**Vulnerability:** Programmatic `window.open(url, '_blank')` calls in React components (`src/pages/TasteMap/Card.tsx`, `src/pages/TasteMap/DetailModal.tsx`) were missing the `'noopener,noreferrer'` feature string. This allows the opened page to potentially access the `window.opener` object and redirect the original page to a malicious site.
+**Learning:** Even when using standard web APIs like `window.open` within a modern framework like React, standard web security risks like reverse tabnabbing still apply. While React protects against many things, it doesn't automatically secure raw browser APIs.
+**Prevention:** Always explicitly pass `'noopener,noreferrer'` as the third argument to `window.open` when opening external links in a new tab: `window.open(url, '_blank', 'noopener,noreferrer')`.
