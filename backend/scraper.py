@@ -190,6 +190,43 @@ CATEGORY_KEYWORDS = {
     '素食': ['素食', '蔬食', 'vegan'],
 }
 
+# ⚡ Bolt Optimization: Pre-compile regexes for O(1) loop performance
+_RE_NUMBERING = re.compile(r'^[\d#①②③④⑤⑥⑦⑧⑨⑩\.\)、\s：:]+')
+_RE_BRACKETS = re.compile(r'[【】\[\]「」『』《》〈〉]+')
+_RE_SUFFIX = re.compile(r'[\|｜\-–—]\s*.*$')
+_RE_SENTENCE_SPLIT = re.compile(r'[。！？!?\n]')
+
+# ⚡ Bolt Optimization: Define sets for O(1) lookup in stop word filtering
+_SKIP_PATTERNS = [
+    '推薦', '必吃', '攻略', '總整理', '懶人包', '目錄', '前言', '結語', '總結',
+    '延伸閱讀', '相關文章', '留言', '分享', '目次', '營業時間', '結論',
+    '地址', '電話', '價格', '菜單', '評價', '最新', '更新', '介紹',
+    '分類', '近期文章', '搜尋', '標籤', '彙整', '關於', '首頁',
+    '訂閱', '追蹤', '聯絡', '隱私權', '版權', '免責', '廣告',
+    '側邊欄', '回到頂端', '上一篇', '下一篇', '熱門文章', '文章導覽',
+    'more', 'share', 'comment', 'copyright', 'menu', 'navigation',
+    'sidebar', 'footer', 'header', 'widget', 'category',
+    'recent', 'popular', 'archive', 'tag', 'about', 'contact',
+    'subscribe', 'follow', 'search', 'login', 'sign',
+    '台灣', '交通', '怎麼去', '捷運', '公車', '停車',
+    '咖啡廳推薦', '餐廳推薦', '景點推薦', '夜市推薦',
+    '住宿', '飯店', '旅館', '民宿',
+    '工作', '職缺', '薪資', '保險', '貸款', '投資', '理財',
+    '新聞', '政治', '科技', '教育', '健康', '醫療',
+    '店家資訊', '用餐資訊', '基本資訊', '注意事項',
+    '閱讀更多', '更多', '看更多', '點我', '此文', '有幫助',
+    '這裡去', '這裡看', '繼續閱讀', '回目錄', '回首頁',
+    '喜歡', '收藏', '按讚', '複製連結', '檢舉', '回報',
+    '相關推薦', '你可能也喜歡', '猜你喜歡', '也想看',
+    '常見問題', 'FAQ', '問答', 'Q&A',
+]
+_CITY_NAMES_SET = {
+    '台北', '台中', '高雄', '台南', '新竹', '桃園', '花蓮',
+    '宜蘭', '嘉義', '彰化', '屏東', '基隆', '苗栗', '南投',
+    '信義區', '大安區', '中山區', '松山區', '中正區', '萬華區',
+    '士林區', '內湖區', '南港區', '文山區', '北投區', '大同區'
+}
+
 
 def get_site_name(url):
     """Extract a human-readable site name from a URL."""
@@ -382,44 +419,20 @@ def extract_places_from_article(url, max_names=5):
 
             raw_text = candidate['text']
             # Clean up numbering
-            cleaned = re.sub(r'^[\d#①②③④⑤⑥⑦⑧⑨⑩\.\)、\s：:]+', '', raw_text).strip()
-            cleaned = re.sub(r'[【】\[\]「」『』《》〈〉]+', '', cleaned).strip()
-            cleaned = re.sub(r'[\|｜\-–—]\s*.*$', '', cleaned).strip()
+            cleaned = _RE_NUMBERING.sub('', raw_text).strip()
+            cleaned = _RE_BRACKETS.sub('', cleaned).strip()
+            cleaned = _RE_SUFFIX.sub('', cleaned).strip()
 
             if not cleaned or len(cleaned) < 3 or len(cleaned) > 35:
                 continue
 
-            skip_patterns = [
-                '推薦', '必吃', '攻略', '總整理', '懶人包', '目錄', '前言', '結語', '總結',
-                '延伸閱讀', '相關文章', '留言', '分享', '目次', '營業時間', '結論',
-                '地址', '電話', '價格', '菜單', '評價', '最新', '更新', '介紹',
-                '分類', '近期文章', '搜尋', '標籤', '彙整', '關於', '首頁',
-                '訂閱', '追蹤', '聯絡', '隱私權', '版權', '免責', '廣告',
-                '側邊欄', '回到頂端', '上一篇', '下一篇', '熱門文章', '文章導覽',
-                'more', 'share', 'comment', 'copyright', 'menu', 'navigation',
-                'sidebar', 'footer', 'header', 'widget', 'category',
-                'recent', 'popular', 'archive', 'tag', 'about', 'contact',
-                'subscribe', 'follow', 'search', 'login', 'sign',
-                '台灣', '交通', '怎麼去', '捷運', '公車', '停車',
-                '咖啡廳推薦', '餐廳推薦', '景點推薦', '夜市推薦',
-                '住宿', '飯店', '旅館', '民宿',
-                '工作', '職缺', '薪資', '保險', '貸款', '投資', '理財',
-                '新聞', '政治', '科技', '教育', '健康', '醫療',
-                '店家資訊', '用餐資訊', '基本資訊', '注意事項',
-                '閱讀更多', '更多', '看更多', '點我', '此文', '有幫助',
-                '這裡去', '這裡看', '繼續閱讀', '回目錄', '回首頁',
-                '喜歡', '收藏', '按讚', '複製連結', '檢舉', '回報',
-                '相關推薦', '你可能也喜歡', '猜你喜歡', '也想看',
-                '常見問題', 'FAQ', '問答', 'Q&A',
-            ]
-            if any(skip in cleaned.lower() for skip in skip_patterns):
+            # ⚡ Bolt Optimization: Use module-level constants and optimize case folding
+            cleaned_lower = cleaned.lower()
+            if any(skip in cleaned_lower for skip in _SKIP_PATTERNS):
                 continue
 
-            city_names = ['台北', '台中', '高雄', '台南', '新竹', '桃園', '花蓮',
-                          '宜蘭', '嘉義', '彰化', '屏東', '基隆', '苗栗', '南投',
-                          '信義區', '大安區', '中山區', '松山區', '中正區', '萬華區',
-                          '士林區', '內湖區', '南港區', '文山區', '北投區', '大同區']
-            if cleaned in city_names:
+            # ⚡ Bolt Optimization: O(1) set lookup for exact match
+            if cleaned in _CITY_NAMES_SET:
                 continue
 
             if not (re.search(r'[\u4e00-\u9fff]', cleaned) or re.search(r'[A-Z][a-z]', cleaned)):
@@ -460,7 +473,8 @@ def extract_nearby_text(tag_obj, place_name):
 
     if sentences:
         full_text = ' '.join(sentences)
-        sentence_list = re.split(r'[。！？!?\n]', full_text)
+        # ⚡ Bolt Optimization: Use pre-compiled regex
+        sentence_list = _RE_SENTENCE_SPLIT.split(full_text)
         for s in sentence_list:
             s = s.strip()
             if len(s) > 10 and len(s) < 120:

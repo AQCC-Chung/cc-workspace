@@ -16,6 +16,7 @@ describe('Card Component', () => {
     };
 
     const mockOnClick = vi.fn();
+    beforeEach(() => { mockOnClick.mockClear(); });
 
     it('renders card with correct data', () => {
         render(<Card data={mockData} onClick={mockOnClick} />);
