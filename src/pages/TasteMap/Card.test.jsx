@@ -39,6 +39,10 @@ describe('Card Component', () => {
         expect(screen.getByText('📝 網路推薦')).toBeInTheDocument();
     });
 
+    beforeEach(() => {
+        mockOnClick.mockClear();
+    });
+
     it('calls onClick when card is clicked', () => {
         render(<Card data={mockData} onClick={mockOnClick} />);
 

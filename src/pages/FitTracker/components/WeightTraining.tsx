@@ -510,6 +510,7 @@ ${historyText || '無歷史紀錄'}
                 </div>
                 <button onClick={handleCloseExercise}
                   className="w-10 h-10 bg-white/50 border border-white/40 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 transition-all shrink-0 ml-3"
+                  aria-label="關閉"
                 >✕</button>
               </div>
 
@@ -725,7 +726,7 @@ ${historyText || '無歷史紀錄'}
             <div className="bg-white w-full max-w-sm h-auto max-h-[80vh] flex flex-col rounded-[2.5rem] shadow-2xl p-6 sm:p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-6 px-1">
                 <h3 className="text-xl font-black text-slate-800 tracking-tight">編輯{CATEGORIES_CN[editingCategory]}器材</h3>
-                <button onClick={() => setEditingCategory(null)} className="p-2 -mr-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors">✕</button>
+                <button onClick={() => setEditingCategory(null)} className="p-2 -mr-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors" aria-label="關閉">✕</button>
               </div>
               <div className="overflow-y-auto pr-2 space-y-3 flex-1 no-scrollbar">
                 {exercises.filter(ex => ex.category === editingCategory).map(ex => (
