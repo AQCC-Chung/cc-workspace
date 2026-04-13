@@ -1,0 +1,3 @@
+## 2024-06-25 - Custom Toggle Buttons Require Specific ARIA Roles
+**Learning:** When building custom toggle switches using `<button>` elements (like the TTS and Periodization settings in FitTracker), visual styling (e.g., sliding indicators) is not enough for screen readers. They require explicit `role="switch"` and `aria-checked={boolean}` attributes, along with an `aria-label`, to properly communicate their state and function to assistive technologies.
+**Action:** Always verify that custom UI controls that mimic standard HTML inputs (like checkboxes or radio buttons) implement the corresponding ARIA roles and states.

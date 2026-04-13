@@ -37,9 +37,9 @@ const CalendarView: React.FC<Props> = ({ weightSessions, cardioRecords, exercise
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div className="flex justify-between items-center mb-6">
-          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)))} className="p-2 hover:bg-slate-100 rounded-full">◀</button>
+          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)))} aria-label="上個月" className="p-2 hover:bg-slate-100 rounded-full">◀</button>
           <h2 className="text-lg font-bold text-slate-800">{monthName}</h2>
-          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)))} className="p-2 hover:bg-slate-100 rounded-full">▶</button>
+          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)))} aria-label="下個月" className="p-2 hover:bg-slate-100 rounded-full">▶</button>
         </div>
 
         <div className="grid grid-cols-7 gap-1 text-center mb-2">
