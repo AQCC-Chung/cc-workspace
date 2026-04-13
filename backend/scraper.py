@@ -5,7 +5,9 @@ import re
 import random
 import os
 import json
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse, quote, urljoin
+import socket
+import ipaddress
 from dotenv import load_dotenv
 from query_parser import parse_query
 
@@ -308,6 +310,21 @@ def get_google_place_type_query(keyword, city='台北'):
     return None
 
 
+
+def is_safe_url(url):
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        ip = socket.gethostbyname(hostname)
+        ip_obj = ipaddress.ip_address(ip)
+        return not (ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_multicast or ip_obj.is_unspecified)
+    except Exception:
+        return False
+
 # ---------- Step 1: Search DuckDuckGo for article URLs ----------
 def search_articles(keyword, max_articles=5):
     """Search DuckDuckGo Lite and return a list of article dicts."""
@@ -351,7 +368,23 @@ def extract_places_from_article(url, max_names=5):
     results = []
 
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
+        current_url = url
+        redirects = 0
+        while redirects < 5:
+            if not is_safe_url(current_url):
+                print(f"  Unsafe URL blocked: {current_url}")
+                return []
+
+            response = requests.get(current_url, headers=HEADERS, timeout=10, allow_redirects=False)
+            if response.status_code in (301, 302, 303, 307, 308):
+                location = response.headers.get('Location')
+                if not location:
+                    break
+                current_url = urljoin(current_url, location)
+                redirects += 1
+            else:
+                break
+
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
 
