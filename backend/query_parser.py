@@ -150,6 +150,8 @@ STOP_WORDS = [
 # Sort stop words by length (longest first) for greedy removal
 _SORTED_STOPS = sorted(STOP_WORDS, key=len, reverse=True)
 
+# ── Pre-compiled Regexes for Performance ──
+_RE_WHITESPACE = re.compile(r'\s+')
 
 class ParsedQuery:
     """Structured result of query parsing."""
@@ -255,8 +257,9 @@ def parse_query(raw_input: str) -> ParsedQuery:
 
     # 1. Remove stop words first
     for stop in _SORTED_STOPS:
-        text = text.replace(stop, ' ')
-    text = re.sub(r'\s+', ' ', text).strip()
+        if stop in text:
+            text = text.replace(stop, ' ')
+    text = _RE_WHITESPACE.sub(' ', text).strip()
 
     # 2. Extract city (longest match first)
     for alias in _SORTED_ALIASES:
@@ -267,7 +270,7 @@ def parse_query(raw_input: str) -> ParsedQuery:
             text = text.replace(alias, ' ', 1)
             break
 
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = _RE_WHITESPACE.sub(' ', text).strip()
 
     # 3. Extract intent words
     for intent_zh, intent_en in INTENT_WORDS.items():
@@ -276,7 +279,7 @@ def parse_query(raw_input: str) -> ParsedQuery:
             result.intents_en.append(intent_en)
             text = text.replace(intent_zh, ' ', 1)
 
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = _RE_WHITESPACE.sub(' ', text).strip()
 
     # 4. Extract food/topic keywords
     for food in _SORTED_FOOD:
@@ -285,7 +288,7 @@ def parse_query(raw_input: str) -> ParsedQuery:
             result.topics_en.append(FOOD_KEYWORDS[food])
             text = text.replace(food, ' ', 1)
 
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = _RE_WHITESPACE.sub(' ', text).strip()
 
     # 5. Extract category keywords
     for cat in _SORTED_CATEGORY:
@@ -295,7 +298,7 @@ def parse_query(raw_input: str) -> ParsedQuery:
             text = text.replace(cat, ' ', 1)
 
     # 6. Whatever is left is the remainder
-    result.remainder = re.sub(r'\s+', ' ', text).strip()
+    result.remainder = _RE_WHITESPACE.sub(' ', text).strip()
 
     # 7. Default city if none detected
     if not result.city:
