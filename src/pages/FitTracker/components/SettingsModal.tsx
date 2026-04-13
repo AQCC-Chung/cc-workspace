@@ -91,6 +91,9 @@ const SettingsModal: React.FC<Props> = ({
             </div>
             <button
               onClick={() => setTtsEnabled(!ttsEnabled)}
+              role="switch"
+              aria-checked={ttsEnabled}
+              aria-label="語音激勵"
               className={`w-12 h-7 rounded-full transition-all relative ${ttsEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
             >
               <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-1 transition-all ${ttsEnabled ? 'left-6' : 'left-1'}`} />
@@ -131,6 +134,7 @@ const SettingsModal: React.FC<Props> = ({
                     onClick={() => {
                       setShowPeriodizationInfo(true);
                     }}
+                    aria-label="什麼是 Smart Coach 週期？"
                     className="w-4 h-4 bg-slate-200 rounded-full text-[8px] font-black text-slate-500 flex items-center justify-center hover:bg-slate-300 transition-colors"
                   >?</button>
                 </div>
@@ -139,6 +143,9 @@ const SettingsModal: React.FC<Props> = ({
             </div>
             <button
               onClick={() => setPeriodizationEnabled(!periodizationEnabled)}
+              role="switch"
+              aria-checked={periodizationEnabled}
+              aria-label="Smart Coach 週期"
               className={`w-12 h-7 rounded-full transition-all relative ${periodizationEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
             >
               <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-1 transition-all ${periodizationEnabled ? 'left-6' : 'left-1'}`} />
