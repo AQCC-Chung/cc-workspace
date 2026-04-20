@@ -90,6 +90,9 @@ const SettingsModal: React.FC<Props> = ({
               </div>
             </div>
             <button
+              role="switch"
+              aria-checked={ttsEnabled}
+              aria-label="語音激勵"
               onClick={() => setTtsEnabled(!ttsEnabled)}
               className={`w-12 h-7 rounded-full transition-all relative ${ttsEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
             >
@@ -128,6 +131,7 @@ const SettingsModal: React.FC<Props> = ({
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-black text-slate-800">Smart Coach 週期</p>
                   <button
+                    aria-label="Smart Coach 週期說明"
                     onClick={() => {
                       setShowPeriodizationInfo(true);
                     }}
@@ -138,6 +142,9 @@ const SettingsModal: React.FC<Props> = ({
               </div>
             </div>
             <button
+              role="switch"
+              aria-checked={periodizationEnabled}
+              aria-label="Smart Coach 週期"
               onClick={() => setPeriodizationEnabled(!periodizationEnabled)}
               className={`w-12 h-7 rounded-full transition-all relative ${periodizationEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
             >
