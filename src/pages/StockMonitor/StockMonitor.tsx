@@ -762,6 +762,14 @@ export default function StockMonitor() {
   const [showModal, setShowModal] = useState(false)
   const [chartTicker, setChartTicker] = useState<string | null>(null)
 
+  // Hoist active ticker data lookups to avoid O(N) searches during every render
+  const activeTickerData = useMemo(() => {
+    if (!chartTicker) return null
+    return scanData?.results.find(r => r.ticker === chartTicker) ||
+           screenerData?.results.find(r => r.ticker === chartTicker) ||
+           null
+  }, [chartTicker, scanData, screenerData])
+
   // Sort
   const [sortKey, setSortKey] = useState<SortKey>('score')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -821,8 +829,8 @@ export default function StockMonitor() {
   // Auto-fetch signal when chart opens for a ticker without existing scan data
   useEffect(() => {
     if (!chartTicker) return
-    const hasData = scanData?.results.find(r => r.ticker === chartTicker) ||
-                    screenerData?.results.find(r => r.ticker === chartTicker)
+    const hasData = activeTickerData
+
     if (hasData) return
     const controller = new AbortController()
     fetch(`${API_BASE}/api/stock/scan?tickers=${chartTicker}`, { signal: controller.signal })
@@ -1064,16 +1072,8 @@ export default function StockMonitor() {
       {chartTicker && (
         <ChartPanel key={chartTicker} ticker={chartTicker}
           entryPrice={getWatchItem(chartTicker)?.entryPrice}
-          signal={
-            scanData?.results.find(r => r.ticker === chartTicker)?.signal ??
-            screenerData?.results.find(r => r.ticker === chartTicker)?.signal ??
-            undefined
-          }
-          score={
-            scanData?.results.find(r => r.ticker === chartTicker)?.score ??
-            screenerData?.results.find(r => r.ticker === chartTicker)?.score ??
-            undefined
-          }
+          signal={activeTickerData?.signal ?? undefined}
+          score={activeTickerData?.score ?? undefined}
           onClose={() => setChartTicker(null)} />
       )}
 
